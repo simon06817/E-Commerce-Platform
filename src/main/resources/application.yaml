@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: E-Commerce-Platform
+  datasource:
+    url: jdbc:mysql://localhost:3306/project01?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  security:
+    user:
+      name: admin
+      password: 123456
+      roles: ADMIN
+
+
+mybatis-plus:
+  type-enums-package: com.example.project01.common
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    cache-enabled: false
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+
+# 阿里云AI配置
+aliyun:
+  ai:
+    api-key: sk-cd69ebc428de44d093fae7690d6b57ec
+    model: qwen-turbo
+
