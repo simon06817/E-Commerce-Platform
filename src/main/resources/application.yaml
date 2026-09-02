@@ -1,17 +1,28 @@
 spring:
   application:
     name: E-Commerce-Platform
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   datasource:
-    url: jdbc:mysql://localhost:3306/project01?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true
-    username: root
-    password: 123456
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/E-Commerce_Platform?useUnicode=true&characterEncoding=utf-8&useSSL=false&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=convertToNull&transformedBitIsBoolean=true&allowMultiQueries=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
-  security:
-    user:
-      name: admin
-      password: 123456
-      roles: ADMIN
-
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:default}
+      password: ${REDIS_PASSWORD:}
+  cache:
+    type: redis
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
 
 mybatis-plus:
   type-enums-package: com.example.project01.common
@@ -26,10 +37,15 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expire-hours: 24
+  upload:
+    dir: ${UPLOAD_DIR:./uploads}
+    url-prefix: /uploads/
 
-# 阿里云AI配置
 aliyun:
   ai:
-    api-key: sk-cd69ebc428de44d093fae7690d6b57ec
+    api-key: ${ALIYUN_AI_API_KEY:}
     model: qwen-turbo
-

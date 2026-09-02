@@ -1,7 +1,15 @@
 package com.example.project01.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
-import jakarta.validation.constraints.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -10,38 +18,39 @@ import java.time.LocalDateTime;
 @Data
 @TableName("product")
 public class Product {
-    @TableId(type= IdType.AUTO)
+
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @NotBlank(message = "商品名称不能为空")
-    @Size(min = 1, max = 100, message = "商品名称长度必须在1-100个字符之间")
+    @NotNull(message = "seller id must not be null")
+    private Long sellerId;
+
+    @NotBlank(message = "product name must not be blank")
+    @Size(min = 1, max = 100, message = "product name length must be 1-100")
     private String name;
 
-    @Size(max = 500, message = "商品描述不能超过500个字符")
+    @Size(max = 500, message = "product description cannot exceed 500 chars")
     private String description;
 
-
-    @NotNull(message = "商品价格不能为空")
-    @DecimalMin(value = "0.01", message = "商品价格必须大于0")
+    @NotNull(message = "product price must not be null")
+    @DecimalMin(value = "0.01", message = "product price must be greater than 0")
     private BigDecimal price;
 
-    @NotNull(message = "商品库存不能为空")
-    @Min(value = 0, message = "商品库存不能小于0")
+    @NotNull(message = "product stock must not be null")
+    @Min(value = 0, message = "product stock cannot be negative")
     private Integer stock;
 
-
-    @NotNull(message = "商品分类ID不能为空")
+    @NotNull(message = "category id must not be null")
     private Long categoryId;
 
-    private String mainImage;  //主页url
+    private String mainImage;
 
-    @NotNull(message = "商品状态不能为空")
-    private Integer status;// 0上架 1下架
+    @NotNull(message = "product status must not be null")
+    private Integer status;
 
-    @TableField(fill= FieldFill.INSERT)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    @TableField(fill= FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
-
 }

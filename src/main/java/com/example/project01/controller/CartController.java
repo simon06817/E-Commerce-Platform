@@ -1,8 +1,9 @@
 package com.example.project01.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.project01.common.LoginUser;
 import com.example.project01.common.Result;
-import com.example.project01.common.ResultCode;
+import com.example.project01.dto.CartAddRequest;
+import com.example.project01.dto.CartUpdateRequest;
 import com.example.project01.entity.Cart;
 import com.example.project01.service.CartService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,12 +12,20 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@Tag(name = "购物车管理", description = "购物车的增删改查接口")
+@Tag(name = "Cart", description = "buyer cart management")
 @RestController
 @RequestMapping("/api/carts")
 @RequiredArgsConstructor
@@ -25,58 +34,46 @@ public class CartController {
 
     private final CartService cartService;
 
-    // 获取当前用户购物车列表（此处userId从请求头或token获取，简化处理传参）
-    @Operation(summary = "查询购物车列表", description = "获取指定用户的购物车商品列表")
+    @Operation(summary = "My cart", description = "buyer only")
     @GetMapping
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public Result<List<Cart>> listByUser(@RequestParam @NotNull Long userId) {
-        List<Cart> list = cartService.list(new LambdaQueryWrapper<Cart>()
-                .eq(Cart::getUserId, userId)
-                .orderByDesc(Cart::getCreateTime));
-        return Result.success(list);
+    @PreAuthorize("hasRole('BUYER')")
+    public Result<List<Cart>> list(@AuthenticationPrincipal LoginUser loginUser) {
+        return Result.success(cartService.getCartList(loginUser.getId()));
     }
 
-    // 加入购物车
-    @Operation(summary = "加入购物车", description = "将商品添加到购物车")
+    @Operation(summary = "Add to cart", description = "buyer only")
     @PostMapping
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public Result<Void> add(@RequestBody @Valid Cart cart) {
-        // 检查是否已存在相同商品，存在则更新数量（业务可自行扩展）
-        cartService.save(cart);
+    @PreAuthorize("hasRole('BUYER')")
+    public Result<Void> add(@AuthenticationPrincipal LoginUser loginUser,
+                            @RequestBody @Valid CartAddRequest request) {
+        cartService.addCart(loginUser.getId(), request.getProductId(), request.getNum());
         return Result.success();
     }
 
-    // 更新购物车项数量
-    @Operation(summary = "更新购物车商品数量", description = "修改购物车中指定商品的数量")
+    @Operation(summary = "Update cart quantity", description = "buyer only")
     @PutMapping("/{id}/num")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public Result<Void> updateQuantity(@PathVariable @NotNull Long id,
-                                       @RequestParam @NotNull Integer num) {
-        Cart cart = cartService.getById(id);
-        if (cart == null) {
-            return Result.error(ResultCode.CART_ITEM_NOT_FOUND);
-        }
-        cart.setNum(num);
-        cartService.updateById(cart);
+    @PreAuthorize("hasRole('BUYER')")
+    public Result<Void> updateNum(@AuthenticationPrincipal LoginUser loginUser,
+                                  @PathVariable @NotNull Long id,
+                                  @RequestBody @Valid CartUpdateRequest request) {
+        cartService.updateCartNum(loginUser.getId(), id, request.getNum());
         return Result.success();
     }
 
-    // 删除购物车项
-    @Operation(summary = "删除购物车商品", description = "从购物车中移除指定商品")
+    @Operation(summary = "Delete cart item", description = "buyer only")
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public Result<Void> delete(@PathVariable @NotNull Long id) {
-        cartService.removeById(id);
+    @PreAuthorize("hasRole('BUYER')")
+    public Result<Void> delete(@AuthenticationPrincipal LoginUser loginUser,
+                               @PathVariable @NotNull Long id) {
+        cartService.deleteCart(loginUser.getId(), id);
         return Result.success();
     }
 
-    // 清空用户购物车
-    @Operation(summary = "清空购物车", description = "清空指定用户的所有购物车商品")
-    @DeleteMapping("/clear/{userId}")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public Result<Void> clear(@PathVariable @NotNull Long userId) {
-        cartService.remove(new LambdaQueryWrapper<Cart>().eq(Cart::getUserId, userId));
+    @Operation(summary = "Clear cart", description = "buyer only")
+    @DeleteMapping("/clear")
+    @PreAuthorize("hasRole('BUYER')")
+    public Result<Void> clear(@AuthenticationPrincipal LoginUser loginUser) {
+        cartService.clearCart(loginUser.getId());
         return Result.success();
     }
-
 }

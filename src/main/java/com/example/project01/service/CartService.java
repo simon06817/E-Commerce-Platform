@@ -7,19 +7,13 @@ import java.util.List;
 
 public interface CartService extends IService<Cart> {
 
-    // 获取购物车列表
-    List<Cart> getCartList(Long userId);
+    List<Cart> getCartList(Long buyerId);
 
-    // 添加商品到购物车(存在则增加数量)
-    void addCart(Long userId, Long productId, Integer num);
+    void addCart(Long buyerId, Long productId, Integer num);
 
-    // 修改购物车商品数量
-    void updateCartNum(Long cartId, Integer num);
+    void updateCartNum(Long buyerId, Long cartId, Integer num);
 
-    // 删除购物车商品
-    void deleteCart(Long cartId);
+    void deleteCart(Long buyerId, Long cartId);
 
-    // 下单后清空购物车
-    void clearCart(Long userId);
-
+    void clearCart(Long buyerId);
 }

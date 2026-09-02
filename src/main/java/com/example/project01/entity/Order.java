@@ -1,7 +1,13 @@
 package com.example.project01.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
-import jakarta.validation.constraints.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -10,45 +16,43 @@ import java.time.LocalDateTime;
 @Data
 @TableName("order_info")
 public class Order {
-    @TableId(type= IdType.AUTO)
+
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @NotBlank(message = "订单号不能为空")
-    @Size(max = 50, message = "订单号长度不能超过50个字符")
-    private String orderId; //订单号
+    @NotBlank(message = "order no must not be blank")
+    @Size(max = 50, message = "order no length cannot exceed 50")
+    @TableField("order_no")
+    private String orderNo;
 
-    @NotNull(message = "用户ID不能为空")
-    private Long userId;
+    @NotNull(message = "buyer id must not be null")
+    private Long buyerId;
 
-    @NotNull(message = "订单总金额不能为空")
-    @DecimalMin(value = "0.01", message = "订单总金额必须大于0")
-    private BigDecimal totalPrice;
+    @NotNull(message = "total amount must not be null")
+    @TableField("total_amount")
+    private BigDecimal totalAmount;
 
-    @NotNull(message = "订单状态不能为空")
-    private Integer status; // 0未付款 1已付款 2已发货 3已完成 4已取消
+    @NotNull(message = "order status must not be null")
+    private Integer status;
 
-    @NotBlank(message = "收货地址不能为空")
-    @Size(max = 200, message = "收货地址长度不能超过200个字符")
-    private String address;
-
-    @NotBlank(message = "收货人姓名不能为空")
-    @Size(min = 1, max = 50, message = "收货人姓名长度必须在1-50个字符之间")
+    @NotBlank(message = "receiver name must not be blank")
+    @Size(min = 1, max = 50, message = "receiver name length must be 1-50")
     private String receiverName;
 
-
-    @NotBlank(message = "收货人电话不能为空")
-    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "收货人电话格式不正确")
+    @NotBlank(message = "receiver phone must not be blank")
+    @Size(max = 20, message = "receiver phone length cannot exceed 20")
     private String receiverPhone;
 
-    @NotBlank(message = "详细收货地址不能为空")
-    @Size(max = 200, message = "详细收货地址长度不能超过200个字符")
+    @NotBlank(message = "receiver address must not be blank")
+    @Size(max = 200, message = "receiver address length cannot exceed 200")
     private String receiverAddress;
 
-    @TableField(fill= FieldFill.INSERT)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    @TableField(fill= FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
-    private  LocalDateTime payTime;
+    @TableField("payment_time")
+    private LocalDateTime payTime;
 }

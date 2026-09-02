@@ -2,20 +2,19 @@ package com.example.project01.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.example.project01.dto.OrderCreateRequest;
 import com.example.project01.entity.Order;
+import com.example.project01.vo.OrderVO;
 
 public interface OrderService extends IService<Order> {
 
-    //分页查询订单列表
-    Page<Order> getOrderPage(int current, int size, Long userId, String status);
+    Page<Order> getOrderPage(Long buyerId, int current, int size, Integer status);
 
-    //创建订单
-    Order createOrder(Long userId, String  address);
+    OrderVO getOrderDetail(Long buyerId, Long orderId);
 
-    //取消订单
-    void cancelOrder(Long orderId);
+    Order createOrder(Long buyerId, OrderCreateRequest request);
 
-    //支付订单
-    void payOrder(Long orderId);
+    void cancelOrder(Long buyerId, Long orderId);
 
+    void payOrder(Long buyerId, Long orderId);
 }

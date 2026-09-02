@@ -1,6 +1,5 @@
 package com.example.project01.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.project01.common.Result;
 import com.example.project01.common.ResultCode;
 import com.example.project01.entity.Product;
@@ -14,11 +13,23 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
-@Tag(name = "商品分类管理", description = "商品分类的增删改查接口")
+@Tag(name = "Product categories", description = "category tree and management")
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
@@ -28,26 +39,20 @@ public class ProductCategoryController {
     private final ProductCategoryService categoryService;
     private final ProductService productService;
 
-    // 获取分类树（层级结构）
-    @Operation(summary = "获取分类树", description = "获取所有商品分类的树形结构数据")
+    @Operation(summary = "Category tree", description = "public")
     @GetMapping("/tree")
     public Result<List<ProductCategory>> tree() {
-        List<ProductCategory> list = categoryService.list(
-                new LambdaQueryWrapper<ProductCategory>().orderByAsc(ProductCategory::getSortOrder)
-        );
-        // 构建树形结构（此处简化为返回所有，实际可递归构建）
-        return Result.success(list);
+        List<ProductCategory> list = categoryService.listEnabledCategories();
+        return Result.success(buildTree(list));
     }
 
-    // 获取所有分类（平铺）
-    @Operation(summary = "获取所有分类", description = "获取所有商品分类的平铺列表")
+    @Operation(summary = "All categories", description = "public")
     @GetMapping
     public Result<List<ProductCategory>> listAll() {
-        return Result.success(categoryService.list());
+        return Result.success(categoryService.listEnabledCategories());
     }
 
-    // 根据ID查询分类
-    @Operation(summary = "根据ID查询分类", description = "根据分类ID获取详细信息")
+    @Operation(summary = "Category detail", description = "public")
     @GetMapping("/{id}")
     public Result<ProductCategory> getById(@PathVariable @NotNull Long id) {
         ProductCategory category = categoryService.getById(id);
@@ -57,45 +62,66 @@ public class ProductCategoryController {
         return Result.success(category);
     }
 
-    // 新增分类
-    @Operation(summary = "新增分类", description = "创建新的商品分类")
+    @Operation(summary = "Create category", description = "admin only")
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> save(@RequestBody @Valid ProductCategory category) {
-        categoryService.save(category);
+        categoryService.addCategory(category);
         return Result.success();
     }
 
-    // 更新分类
-    @Operation(summary = "更新分类", description = "根据ID更新分类信息")
+    @Operation(summary = "Update category", description = "admin only")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> update(@PathVariable @NotNull Long id,
                                @RequestBody @Valid ProductCategory category) {
         category.setId(id);
-        categoryService.updateById(category);
+        categoryService.updateCategory(category);
         return Result.success();
     }
 
-    // 删除分类（需检查是否有子分类或关联商品）
-    @Operation(summary = "删除分类", description = "根据ID删除分类，需确保无子分类和关联商品")
+    @Operation(summary = "Update category status", description = "admin only")
+    @PutMapping("/{id}/status/{status}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Void> updateStatus(@PathVariable @NotNull Long id,
+                                     @PathVariable @NotNull Integer status) {
+        categoryService.updateStatus(id, status);
+        return Result.success();
+    }
+
+    @Operation(summary = "Delete category", description = "admin only")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> delete(@PathVariable @NotNull Long id) {
-        // 检查是否存在子分类
-        long childCount = categoryService.count(new LambdaQueryWrapper<ProductCategory>()
+        long childCount = categoryService.count(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProductCategory>()
                 .eq(ProductCategory::getParentId, id));
         if (childCount > 0) {
             return Result.error(ResultCode.CATEGORY_HAS_CHILDREN);
         }
-        // 检查是否有关联商品
-        long productCount = productService.count(new LambdaQueryWrapper<Product>()
+        long productCount = productService.count(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Product>()
                 .eq(Product::getCategoryId, id));
         if (productCount > 0) {
             return Result.error(ResultCode.CATEGORY_HAS_CHILDREN);
         }
-        categoryService.removeById(id);
+        categoryService.deleteCategory(id);
         return Result.success();
     }
 
+    private List<ProductCategory> buildTree(List<ProductCategory> list) {
+        Map<Long, ProductCategory> byId = list.stream()
+                .collect(Collectors.toMap(ProductCategory::getId, Function.identity()));
+        List<ProductCategory> roots = new ArrayList<>();
+        for (ProductCategory node : list) {
+            if (node.getParentId() != null && node.getParentId() != 0 && byId.containsKey(node.getParentId())) {
+                ProductCategory parent = byId.get(node.getParentId());
+                if (parent.getChildren() == null) {
+                    parent.setChildren(new ArrayList<>());
+                }
+                parent.getChildren().add(node);
+            } else {
+                roots.add(node);
+            }
+        }
+        return roots;
+    }
 }

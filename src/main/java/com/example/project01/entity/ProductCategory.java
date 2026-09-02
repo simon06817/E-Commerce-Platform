@@ -1,6 +1,10 @@
 package com.example.project01.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -8,34 +12,36 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.util.Date;
+import java.util.List;
 
 @Data
 @TableName("product_category")
 public class ProductCategory {
-    @TableId(type= IdType.AUTO)
+
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @NotBlank(message = "分类名称不能为空")
-    @Size(min = 1, max = 50, message = "分类名称长度必须在1-50个字符之间")
+    @NotBlank(message = "category name must not be blank")
+    @Size(min = 1, max = 50, message = "category name length must be 1-50")
     private String name;
 
-    @NotNull(message = "父分类ID不能为空")
-    @Min(value = 0, message = "父分类ID不能小于0")
+    @NotNull(message = "parent id must not be null")
+    @Min(value = 0, message = "parent id cannot be negative")
     private Long parentId;
 
-    @NotNull(message = "排序号不能为空")
-    @Min(value = 0, message = "排序号不能小于0")
+    @NotNull(message = "sort order must not be null")
+    @Min(value = 0, message = "sort order cannot be negative")
     private Integer sortOrder;
 
-    @NotNull(message = "分类状态不能为空")
+    @NotNull(message = "category status must not be null")
     private Integer status;
 
-    @TableField(fill= FieldFill.INSERT)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    @TableField(fill= FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
-
+    @TableField(exist = false)
+    private List<ProductCategory> children;
 }

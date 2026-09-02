@@ -7,16 +7,16 @@ import com.example.project01.entity.ProductCategory;
 import java.util.List;
 
 public interface ProductCategoryService extends IService<ProductCategory> {
-    //分页查询分类列表
+
+    List<ProductCategory> listEnabledCategories();
+
     Page<ProductCategory> getCategoryPage(int current, int size, String name);
 
-    //获取所有启用的分类（用于下拉框）
-    List<ProductCategory> getEnabledCategories();
-
-    //新增分类
     void addCategory(ProductCategory category);
 
-    //更新分类状态
+    void updateCategory(ProductCategory category);
+
     void updateStatus(Long id, Integer status);
 
+    void deleteCategory(Long id);
 }
