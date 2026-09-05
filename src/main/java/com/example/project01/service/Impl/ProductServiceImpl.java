@@ -4,20 +4,33 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.project01.cache.CacheNames;
+import com.example.project01.cache.CacheSupport;
+import com.example.project01.cache.ProductBloomFilter;
 import com.example.project01.common.BusinessException;
 import com.example.project01.common.ResultCode;
 import com.example.project01.dto.ProductRequest;
 import com.example.project01.entity.Product;
 import com.example.project01.mapper.ProductMapper;
 import com.example.project01.service.ProductService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
+
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> implements ProductService {
+
+    private final ProductBloomFilter bloomFilter;
+    private final CacheSupport cacheSupport;
 
     @Override
     public Page<Product> getProductPage(int current, int size, Long categoryId, String keyword, Integer status) {
@@ -39,9 +52,15 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     }
 
     @Override
-    @Cacheable(cacheNames = "productDetail", key = "#id")
     public Product getProductById(Long id) {
-        return getById(id);
+        if (!bloomFilter.mightContain(id)) {
+            return null;
+        }
+        return cacheSupport.getOrLoadWithNegativeCache(
+                CacheNames.PRODUCT_DETAIL,
+                CacheNames.PRODUCT_NULL,
+                String.valueOf(id),
+                () -> getById(id));
     }
 
     @Override
@@ -58,6 +77,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         product.setMainImage(request.getMainImage());
         product.setStatus(request.getStatus() == null ? 1 : request.getStatus());
         save(product);
+        bloomFilter.add(product.getId());
     }
 
     @Override
@@ -117,7 +137,6 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "productDetail", key = "#productId")
     public void decreaseStock(Long productId, Integer quantity) {
         Product product = getById(productId);
         if (product == null) {
@@ -132,6 +151,21 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 .setSql("stock = stock - " + quantity));
         if (!success) {
             throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
+        }
+        int newStock = product.getStock() - quantity;
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        product.setStock(newStock);
+                        product.setUpdateTime(LocalDateTime.now());
+                        cacheSupport.put(CacheNames.PRODUCT_DETAIL, String.valueOf(productId), product);
+                    } catch (Exception e) {
+                        log.warn("refresh product cache after stock change failed, id={}", productId, e);
+                    }
+                }
+            });
         }
     }
 }

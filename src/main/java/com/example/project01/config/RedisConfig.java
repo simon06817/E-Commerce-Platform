@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.example.project01.cache.CacheNames;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -41,12 +43,21 @@ public class RedisConfig {
 
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory factory) {
-        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(10))
+        RedisCacheConfiguration positiveConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofMinutes(5))
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
                         new GenericJackson2JsonRedisSerializer(redisObjectMapper())));
-        return RedisCacheManager.builder(factory).cacheDefaults(config).build();
+        RedisCacheConfiguration negativeConfig = positiveConfig.entryTtl(Duration.ofMinutes(1));
+
+        RedisCacheWriter writer =
+                new RandomTtlRedisCacheWriter(RedisCacheWriter.nonLockingRedisCacheWriter(factory));
+
+        return RedisCacheManager.builder(factory)
+                .cacheWriter(writer)
+                .cacheDefaults(positiveConfig)
+                .withCacheConfiguration(CacheNames.PRODUCT_NULL, negativeConfig)
+                .build();
     }
 
     private ObjectMapper redisObjectMapper() {

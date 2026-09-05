@@ -1,5 +1,7 @@
 package com.example.project01.service;
 
+import com.example.project01.cache.CacheSupport;
+import com.example.project01.cache.ProductBloomFilter;
 import com.example.project01.entity.Product;
 import com.example.project01.mapper.ProductMapper;
 import com.example.project01.service.Impl.ProductServiceImpl;
@@ -22,6 +24,12 @@ class ProductServiceImplTest {
 
     @Mock
     private ProductMapper productMapper;
+
+    @Mock
+    private ProductBloomFilter bloomFilter;
+
+    @Mock
+    private CacheSupport cacheSupport;
 
     @InjectMocks
     private ProductServiceImpl productService;
