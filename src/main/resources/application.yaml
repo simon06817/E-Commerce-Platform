@@ -14,8 +14,18 @@ spring:
       port: ${REDIS_PORT:6379}
       username: ${REDIS_USERNAME:default}
       password: ${REDIS_PASSWORD:}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
   cache:
     type: redis
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
   servlet:
     multipart:
       max-file-size: 10MB
@@ -28,7 +38,7 @@ mybatis-plus:
   type-enums-package: com.example.project01.common
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
     cache-enabled: false
   global-config:
     db-config:
@@ -38,9 +48,27 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 app:
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:3000
+  security:
+    login-limit-per-minute: 30
+    login-window-ms: 60000
+  mq:
+    enabled: true
+  rabbitmq:
+    order-exchange: e-commerce.order.exchange
+    order-queue: e-commerce.order.queue
+    order-routing-key: order.created
+    order-paid-routing-key: order.paid
+  outbox:
+    scan-interval-ms: 10000
   jwt:
     secret: ${JWT_SECRET}
     expire-hours: 24
+  order:
+    expire-minutes: 30
+    close-scan-interval-ms: 60000
+    close-initial-delay-ms: 60000
   upload:
     dir: ${UPLOAD_DIR:./uploads}
     url-prefix: /uploads/
@@ -49,3 +77,11 @@ aliyun:
   ai:
     api-key: ${ALIYUN_AI_API_KEY:}
     model: qwen-turbo
+
+logging:
+  level:
+    root: info
+    com.example.project01.mapper: warn
+    org.mybatis: warn
+    org.mybatis.spring: warn
+    org.springframework.amqp: warn

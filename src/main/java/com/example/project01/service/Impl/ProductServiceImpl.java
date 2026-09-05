@@ -153,19 +153,40 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
         }
         int newStock = product.getStock() - quantity;
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        product.setStock(newStock);
-                        product.setUpdateTime(LocalDateTime.now());
-                        cacheSupport.put(CacheNames.PRODUCT_DETAIL, String.valueOf(productId), product);
-                    } catch (Exception e) {
-                        log.warn("refresh product cache after stock change failed, id={}", productId, e);
-                    }
-                }
-            });
+        refreshProductCacheAfterCommit(productId, product, newStock);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void increaseStock(Long productId, Integer quantity) {
+        Product product = getById(productId);
+        if (product == null) {
+            throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
+        boolean success = update(new LambdaUpdateWrapper<Product>()
+                .eq(Product::getId, productId)
+                .setSql("stock = stock + " + quantity));
+        if (!success) {
+            throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
+        }
+        refreshProductCacheAfterCommit(productId, product, product.getStock() + quantity);
+    }
+
+    private void refreshProductCacheAfterCommit(Long productId, Product product, int newStock) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    product.setStock(newStock);
+                    product.setUpdateTime(LocalDateTime.now());
+                    cacheSupport.put(CacheNames.PRODUCT_DETAIL, String.valueOf(productId), product);
+                } catch (Exception e) {
+                    log.warn("refresh product cache after stock change failed, id={}", productId, e);
+                }
+            }
+        });
     }
 }

@@ -81,6 +81,7 @@ CREATE TABLE cart (
 CREATE TABLE order_info (
   id bigint auto_increment primary key,
   order_no varchar(32) not null unique,
+  idempotency_key varchar(64) unique,
   buyer_id bigint not null,
   total_amount decimal(10,2) not null,
   status tinyint default 0,
@@ -102,4 +103,24 @@ CREATE TABLE order_item (
   quantity int not null,
   subtotal decimal(10,2) not null,
   create_time timestamp default current_timestamp
+);
+
+CREATE TABLE order_outbox (
+  id bigint auto_increment primary key,
+  order_id bigint not null,
+  event_type varchar(50) not null,
+  payload varchar(2000),
+  status tinyint default 0,
+  retry_count int default 0,
+  create_time timestamp default current_timestamp,
+  update_time timestamp default current_timestamp
+);
+
+CREATE TABLE order_event_record (
+  id bigint auto_increment primary key,
+  order_id bigint not null,
+  event_type varchar(50) not null,
+  payload varchar(2000),
+  create_time timestamp default current_timestamp,
+  unique (order_id, event_type)
 );

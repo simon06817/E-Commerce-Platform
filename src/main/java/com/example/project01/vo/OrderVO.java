@@ -20,6 +20,8 @@ public class OrderVO {
 
     private Integer status;
 
+    private String statusText;
+
     private String receiverName;
 
     private String receiverPhone;

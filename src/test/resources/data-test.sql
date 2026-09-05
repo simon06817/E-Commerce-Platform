@@ -5,7 +5,8 @@ INSERT INTO user_buyer (username, password, nickname, phone, email, address) VAL
 ('buyer01', '$2a$10$CybQusAxxBrkYBSVzIOCIeV4P6l5AelPOxJtNrf4FZW4u9RFvIHba', 'buyer one', '13800000001', 'buyer01@example.com', 'Beijing');
 
 INSERT INTO user_seller (username, password, shop_name, phone, email) VALUES
-('seller01', '$2a$10$CybQusAxxBrkYBSVzIOCIeV4P6l5AelPOxJtNrf4FZW4u9RFvIHba', 'Tech Store', '13900000001', 'seller01@example.com');
+('seller01', '$2a$10$CybQusAxxBrkYBSVzIOCIeV4P6l5AelPOxJtNrf4FZW4u9RFvIHba', 'Tech Store', '13900000001', 'seller01@example.com'),
+('seller02', '$2a$10$CybQusAxxBrkYBSVzIOCIeV4P6l5AelPOxJtNrf4FZW4u9RFvIHba', 'Book House', '13900000002', 'seller02@example.com');
 
 INSERT INTO product_category (id, name, parent_id, sort_order, status) VALUES
 (1, '电子产品', 0, 1, 1),

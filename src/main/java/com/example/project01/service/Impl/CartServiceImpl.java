@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 
 @Service
@@ -78,5 +79,16 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements Ca
     @Transactional(rollbackFor = Exception.class)
     public void clearCart(Long buyerId) {
         remove(new LambdaQueryWrapper<Cart>().eq(Cart::getBuyerId, buyerId));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeSelected(Long buyerId, Collection<Long> cartIds) {
+        if (cartIds == null || cartIds.isEmpty()) {
+            return;
+        }
+        remove(new LambdaQueryWrapper<Cart>()
+                .eq(Cart::getBuyerId, buyerId)
+                .in(Cart::getId, cartIds));
     }
 }

@@ -38,6 +38,9 @@ class OrderServiceImplTest {
     private OrderItemService orderItemService;
 
     @Mock
+    private OrderEventService orderEventService;
+
+    @Mock
     private OrderMapper orderMapper;
 
     @InjectMocks
@@ -51,6 +54,7 @@ class OrderServiceImplTest {
     @Test
     void createOrderFromCart() {
         Cart cart = new Cart();
+        cart.setId(5L);
         cart.setBuyerId(1L);
         cart.setProductId(10L);
         cart.setNum(2);
@@ -65,6 +69,7 @@ class OrderServiceImplTest {
         when(productService.getProductById(10L)).thenReturn(product);
 
         OrderCreateRequest request = new OrderCreateRequest();
+        request.setIdempotencyKey("order-key-001");
         request.setReceiverName("Tom");
         request.setReceiverPhone("13800000000");
         request.setReceiverAddress("Beijing");
@@ -72,7 +77,8 @@ class OrderServiceImplTest {
         orderService.createOrder(1L, request);
 
         verify(productService).decreaseStock(10L, 2);
-        verify(cartService).clearCart(1L);
+        verify(cartService).removeSelected(1L, List.of(5L));
+        verify(orderEventService).publishOrderCreated(any(Order.class));
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemService).save(itemCaptor.capture());
         assertEquals("iPhone 15", itemCaptor.getValue().getProductName());
@@ -84,6 +90,7 @@ class OrderServiceImplTest {
     void createOrderWithEmptyCartFails() {
         when(cartService.getCartList(1L)).thenReturn(List.of());
         OrderCreateRequest request = new OrderCreateRequest();
+        request.setIdempotencyKey("order-key-002");
         request.setReceiverName("Tom");
         request.setReceiverPhone("13800000000");
         request.setReceiverAddress("Beijing");

@@ -1,4 +1,8 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
   datasource:
     url: jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
@@ -11,6 +15,8 @@ spring:
       data-locations: classpath:data-test.sql
   cache:
     type: simple
+  flyway:
+    enabled: false
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
@@ -27,6 +33,8 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 app:
+  mq:
+    enabled: false
   jwt:
     secret: ECommercePlatformJwtSecretKey2026ForInternshipProject
     expire-hours: 24

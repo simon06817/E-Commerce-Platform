@@ -7,6 +7,10 @@ import lombok.Data;
 @Data
 public class OrderCreateRequest {
 
+    @NotBlank(message = "idempotency key must not be blank")
+    @Size(max = 64, message = "idempotency key length cannot exceed 64")
+    private String idempotencyKey;
+
     @NotBlank(message = "receiver name must not be blank")
     @Size(max = 50, message = "receiver name length cannot exceed 50")
     private String receiverName;

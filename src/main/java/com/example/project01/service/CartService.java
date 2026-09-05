@@ -3,6 +3,7 @@ package com.example.project01.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.project01.entity.Cart;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface CartService extends IService<Cart> {
@@ -16,4 +17,6 @@ public interface CartService extends IService<Cart> {
     void deleteCart(Long buyerId, Long cartId);
 
     void clearCart(Long buyerId);
+
+    void removeSelected(Long buyerId, Collection<Long> cartIds);
 }

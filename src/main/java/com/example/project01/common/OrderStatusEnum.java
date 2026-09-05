@@ -2,8 +2,6 @@ package com.example.project01.common;
 
 import lombok.Getter;
 
-import java.util.Arrays;
-
 @Getter
 public enum OrderStatusEnum {
     UNPAID(0, "未付款"),
@@ -30,11 +28,4 @@ public enum OrderStatusEnum {
         throw new IllegalArgumentException("未知订单状态: " + code);
     }
 
-//    //stream优化代码
-//    public static OrderStatusEnum fromCode(int code) {
-//        return Arrays.stream(values())
-//                .filter(status -> status.code == code)
-//                .findFirst()
-//                .orElseThrow(() -> new IllegalArgumentException("未知订单状态: " + code));
-//    }
 }

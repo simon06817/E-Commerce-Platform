@@ -10,6 +10,7 @@ public enum ResultCode {
     FORBIDDEN(403, "forbidden"),
     NOT_FOUND(404, "resource not found"),
     INTERNAL_SERVER_ERROR(500, "internal server error"),
+    TOO_MANY_REQUESTS(429, "too many requests"),
 
     USER_NOT_EXIST(1001, "user does not exist"),
     PRODUCT_NOT_EXIST(1002, "product does not exist"),

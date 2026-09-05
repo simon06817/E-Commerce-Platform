@@ -1,8 +1,10 @@
 package com.example.project01.controller;
 
 import com.example.project01.common.Result;
+import com.example.project01.common.ResultCode;
 import com.example.project01.dto.LoginRequest;
 import com.example.project01.dto.RegisterRequest;
+import com.example.project01.security.LoginRateLimiter;
 import com.example.project01.service.AuthService;
 import com.example.project01.vo.LoginResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Tag(name = "Authentication", description = "role-based login and registration")
 @RestController
@@ -21,10 +24,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final LoginRateLimiter loginRateLimiter;
 
     @Operation(summary = "Login", description = "login as ADMIN, BUYER or SELLER")
     @PostMapping("/login")
-    public Result<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
+    public Result<LoginResponse> login(HttpServletRequest httpRequest,
+                                       @RequestBody @Valid LoginRequest request) {
+        String key = httpRequest.getRemoteAddr() + ":" + request.getUsername();
+        if (!loginRateLimiter.allow(key)) {
+            return Result.error(ResultCode.TOO_MANY_REQUESTS);
+        }
         return Result.success(authService.login(request));
     }
 

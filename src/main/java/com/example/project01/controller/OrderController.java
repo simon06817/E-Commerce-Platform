@@ -77,4 +77,13 @@ public class OrderController {
         orderService.payOrder(loginUser.getId(), id);
         return Result.success();
     }
+
+    @Operation(summary = "Confirm receipt", description = "buyer only")
+    @PutMapping("/{id}/confirm")
+    @PreAuthorize("hasRole('BUYER')")
+    public Result<Void> confirm(@AuthenticationPrincipal LoginUser loginUser,
+                                @PathVariable @NotNull Long id) {
+        orderService.confirmOrder(loginUser.getId(), id);
+        return Result.success();
+    }
 }

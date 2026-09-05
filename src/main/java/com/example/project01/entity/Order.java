@@ -25,6 +25,9 @@ public class Order {
     @TableField("order_no")
     private String orderNo;
 
+    @TableField("idempotency_key")
+    private String idempotencyKey;
+
     @NotNull(message = "buyer id must not be null")
     private Long buyerId;
 

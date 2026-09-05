@@ -8,6 +8,8 @@
 - Spring Security + JWT（jjwt 0.12.6）+ BCrypt 密码加密
 - MyBatis-Plus 3.5.15 + MySQL 8
 - Spring Data Redis + Spring Cache（商品/分类缓存）
+- RabbitMQ + 本地消息表（outbox）+ 幂等消费
+- Flyway 数据库版本管理
 - Knife4j / OpenAPI 3 API 文档
 - 阿里云 DashScope（通义千问）AI 接口
 - JUnit 5 + Mockito + H2 + MockMvc 测试
@@ -45,8 +47,12 @@
 核心业务约定：
 
 - 下单时从购物车生成订单，写 `order_info` + `order_item` 商品快照，扣减库存，清空购物车，整体事务包裹
+- 下单幂等键 + 唯一索引，订单超时自动关单并恢复库存
+- 订单事件（ORDER_CREATED/ORDER_PAID）走 outbox + RabbitMQ，消费侧唯一索引幂等
 - 扣库存使用 SQL 级条件更新 `UPDATE product SET stock = stock - ? WHERE id = ? AND stock >= ?`，避免并发超卖
 - 用户表、角色表启用 MyBatis-Plus 逻辑删除（`deleted` 字段）
+
+> 订单模型按“整单状态流转”实现，演示场景以单卖家下单为主；多卖家拆单/明细级发货是后续演进方向。
 
 ## 主要接口
 
