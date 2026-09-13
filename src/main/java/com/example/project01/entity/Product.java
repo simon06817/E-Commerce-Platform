@@ -15,6 +15,9 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Product aggregate owned by a seller. Maps to the {@code product} table.
+ */
 @Data
 @TableName("product")
 public class Product {

@@ -10,6 +10,7 @@ import com.example.project01.entity.UserAdmin;
 import com.example.project01.entity.UserBuyer;
 import com.example.project01.entity.UserSeller;
 import com.example.project01.security.JwtUtil;
+import com.example.project01.security.TokenStore;
 import com.example.project01.service.AuthService;
 import com.example.project01.service.UserAdminService;
 import com.example.project01.service.UserBuyerService;
@@ -19,6 +20,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.util.UUID;
+
+/**
+ * Authenticates accounts against the role-specific tables, issues short-lived
+ * access tokens plus refresh tokens and supports logout/refresh flows.
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -28,9 +36,11 @@ public class AuthServiceImpl implements AuthService {
     private final UserSellerService userSellerService;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final TokenStore tokenStore;
 
     @Override
     public LoginResponse login(LoginRequest request) {
+        // Resolve the correct role table before verifying the password.
         String username = request.getUsername().trim();
         String displayName = username;
         Long userId;
@@ -73,11 +83,11 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ResultCode.USERNAME_OR_PASSWORD_ERROR);
         }
         LoginUser loginUser = new LoginUser(userId, username, request.getRole());
-        return new LoginResponse(jwtUtil.generateToken(loginUser), userId, username, request.getRole(), displayName);
+        return issueTokens(loginUser, displayName);
     }
 
     @Override
-    public void register(RegisterRequest request) {
+    public LoginResponse register(RegisterRequest request) {
         if (request.getRole() == AuthRole.ADMIN) {
             throw new BusinessException(ResultCode.INVALID_ROLE);
         }
@@ -94,6 +104,10 @@ public class AuthServiceImpl implements AuthService {
             buyer.setEmail(request.getEmail());
             buyer.setAddress(request.getAddress());
             userBuyerService.save(buyer);
+
+            String displayName = buyer.getNickname() == null || buyer.getNickname().isBlank()
+                    ? buyer.getUsername() : buyer.getNickname();
+            return issueTokens(new LoginUser(buyer.getId(), buyer.getUsername(), AuthRole.BUYER), displayName);
         } else {
             if (userSellerService.existsByUsername(request.getUsername())) {
                 throw new BusinessException(ResultCode.USER_ALREADY_EXISTS);
@@ -105,6 +119,56 @@ public class AuthServiceImpl implements AuthService {
             seller.setPhone(request.getPhone());
             seller.setEmail(request.getEmail());
             userSellerService.save(seller);
+
+            String displayName = seller.getShopName() == null || seller.getShopName().isBlank()
+                    ? seller.getUsername() : seller.getShopName();
+            return issueTokens(new LoginUser(seller.getId(), seller.getUsername(), AuthRole.SELLER), displayName);
         }
+    }
+
+    @Override
+    public LoginResponse refresh(String refreshToken) {
+        TokenStore.RefreshInfo info = tokenStore.getRefresh(refreshToken)
+                .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED));
+        // Rotate the refresh token so the old one cannot be replayed.
+        tokenStore.deleteRefresh(refreshToken);
+        LoginUser user = new LoginUser(info.userId(), info.username(), AuthRole.valueOf(info.role()));
+        return issueTokens(user, info.displayName());
+    }
+
+    @Override
+    public void logout(String accessToken, String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            tokenStore.deleteRefresh(refreshToken);
+        }
+        if (accessToken != null && accessToken.startsWith("Bearer ")) {
+            try {
+                String raw = accessToken.substring(7);
+                LoginUser user = jwtUtil.parseToken(raw);
+                tokenStore.blacklistAccess(user.getJti(), Duration.ofMillis(jwtUtil.getRemainingMillis(raw)));
+            } catch (Exception ignored) {
+                // Logout still succeeds even when the access token already expired.
+            }
+        }
+    }
+
+    private LoginResponse issueTokens(LoginUser user, String displayName) {
+        String refreshId = UUID.randomUUID().toString();
+        tokenStore.saveRefresh(
+                refreshId,
+                user.getRole().name(),
+                user.getId(),
+                user.getUsername(),
+                displayName,
+                Duration.ofSeconds(jwtUtil.getRefreshExpireSeconds()));
+        return new LoginResponse(
+                jwtUtil.generateToken(user),
+                refreshId,
+                user.getId(),
+                user.getUsername(),
+                user.getRole(),
+                displayName,
+                jwtUtil.getAccessExpireSeconds(),
+                jwtUtil.getRefreshExpireSeconds());
     }
 }

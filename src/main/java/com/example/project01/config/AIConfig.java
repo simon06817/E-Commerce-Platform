@@ -4,6 +4,9 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Binds Aliyun DashScope settings (API key and model name) from configuration.
+ */
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "aliyun.ai")

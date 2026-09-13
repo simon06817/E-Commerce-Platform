@@ -7,6 +7,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Order view object returned to clients, including item snapshots and a
+ * human-readable status description.
+ */
 @Data
 public class OrderVO {
 
@@ -31,6 +35,8 @@ public class OrderVO {
     private LocalDateTime createTime;
 
     private LocalDateTime payTime;
+
+    private LocalDateTime completeTime;
 
     private List<OrderItem> items;
 }

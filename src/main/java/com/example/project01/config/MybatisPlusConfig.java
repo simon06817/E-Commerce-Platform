@@ -31,7 +31,8 @@ public class MybatisPlusConfig {
         paginationInnerInterceptor.setOverflow(false);
 
         // 5. 可选: 单页最大查询限制 (限制攻击, 默认无限制)
-        paginationInnerInterceptor.setMaxLimit(500L);
+        // Hard cap every page query at 100 rows to avoid oversized requests.
+        paginationInnerInterceptor.setMaxLimit(100L);
 
         // 6. 将分页插件添加到拦截器链中 (建议排在第一位)
         interceptor.addInnerInterceptor(paginationInnerInterceptor);

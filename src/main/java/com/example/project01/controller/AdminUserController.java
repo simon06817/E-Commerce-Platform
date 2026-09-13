@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Administrator endpoints for viewing and removing buyer/seller accounts.
+ */
 @Tag(name = "Admin users", description = "admin manages buyers and sellers")
 @RestController
 @RequestMapping("/api/admin/users")

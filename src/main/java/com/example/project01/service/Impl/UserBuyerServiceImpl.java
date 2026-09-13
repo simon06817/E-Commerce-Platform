@@ -9,6 +9,9 @@ import com.example.project01.service.UserBuyerService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+/**
+ * Default buyer account service.
+ */
 @Service
 public class UserBuyerServiceImpl extends ServiceImpl<UserBuyerMapper, UserBuyer> implements UserBuyerService {
 

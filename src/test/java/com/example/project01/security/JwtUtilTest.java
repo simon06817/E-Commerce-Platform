@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class JwtUtilTest {
 
     private final JwtUtil jwtUtil =
-            new JwtUtil("ECommercePlatformJwtSecretKey2026ForInternshipProject", 24);
+            new JwtUtil("ECommercePlatformJwtSecretKey2026ForInternshipProject", 30, 7);
 
     @Test
     void generateAndParseToken() {
@@ -23,6 +23,7 @@ class JwtUtilTest {
         assertEquals(user.getId(), parsed.getId());
         assertEquals(user.getUsername(), parsed.getUsername());
         assertEquals(user.getRole(), parsed.getRole());
+        assertEquals(false, parsed.getJti() == null || parsed.getJti().isBlank());
     }
 
     @Test

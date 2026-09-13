@@ -6,6 +6,9 @@ import com.example.project01.mapper.UserAdminMapper;
 import com.example.project01.service.UserAdminService;
 import org.springframework.stereotype.Service;
 
+/**
+ * Default administrator account service.
+ */
 @Service
 public class UserAdminServiceImpl extends ServiceImpl<UserAdminMapper, UserAdmin> implements UserAdminService {
 

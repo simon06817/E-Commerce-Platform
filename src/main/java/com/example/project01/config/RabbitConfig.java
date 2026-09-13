@@ -13,6 +13,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Declares the order exchange/queue bindings and the JSON message converter
+ * used by the outbox publisher and the event listener.
+ */
 @Configuration
 @ConditionalOnProperty(name = "app.mq.enabled", havingValue = "true")
 public class RabbitConfig {

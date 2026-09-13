@@ -5,6 +5,9 @@ import com.example.project01.entity.OutboxMessage;
 
 import java.util.List;
 
+/**
+ * Stores and tracks outbox messages until they are acknowledged by the broker.
+ */
 public interface OutboxMessageService extends IService<OutboxMessage> {
 
     void savePending(Long orderId, String eventType, String payload);

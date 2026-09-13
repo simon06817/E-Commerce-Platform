@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.function.Supplier;
 
+/**
+ * Cache helper implementing the read-through pattern with cache breakdown
+ * protection and optional negative caching for missing records.
+ */
 @Component
 @RequiredArgsConstructor
 public class CacheSupport {
@@ -21,6 +25,7 @@ public class CacheSupport {
     private final CacheLockService lockService;
 
     public <T> T getOrLoad(String cacheName, String key, Supplier<T> loader) {
+        // Fast path: serve directly from cache without taking the lock.
         Cache cache = cacheManager.getCache(cacheName);
         T cached = read(cache, key);
         if (cached != null) {
@@ -29,6 +34,7 @@ public class CacheSupport {
 
         String lockKey = lockKey(cacheName, key);
         String token = lockService.newToken();
+        // Only one request may rebuild a hot key; others wait and re-read cache.
         if (lockService.tryLock(lockKey, token, LOCK_TTL)) {
             try {
                 T doubleCheck = read(cache, key);
@@ -53,6 +59,7 @@ public class CacheSupport {
                                             String negativeCacheName,
                                             String key,
                                             Supplier<T> loader) {
+        // Negative cache protects the database from repeated lookups of missing ids.
         Cache positive = cacheManager.getCache(positiveCacheName);
         Cache negative = cacheManager.getCache(negativeCacheName);
 

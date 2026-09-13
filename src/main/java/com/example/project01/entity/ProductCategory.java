@@ -14,6 +14,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Product category node. A parentId of 0 means a root category; children are
+ * assembled only for the tree response.
+ */
 @Data
 @TableName("product_category")
 public class ProductCategory {

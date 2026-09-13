@@ -8,6 +8,10 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Product snapshot line of an order. Price and name are frozen at checkout
+ * time so later product changes do not alter historical orders.
+ */
 @Data
 @TableName("order_item")
 public class OrderItem {

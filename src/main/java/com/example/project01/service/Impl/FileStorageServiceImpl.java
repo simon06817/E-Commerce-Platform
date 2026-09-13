@@ -13,6 +13,9 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Stores uploaded images on the local disk with generated file names.
+ */
 @Service
 @RequiredArgsConstructor
 public class FileStorageServiceImpl implements FileStorageService {

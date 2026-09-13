@@ -9,6 +9,9 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
+/**
+ * Seller-facing product create/update payload.
+ */
 @Data
 public class ProductRequest {
 

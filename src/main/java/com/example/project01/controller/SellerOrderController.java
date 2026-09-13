@@ -20,6 +20,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Seller order endpoints. A seller only sees orders containing own products.
+ */
 @Tag(name = "Seller orders", description = "seller manages orders containing own products")
 @RestController
 @RequestMapping("/api/seller/orders")
@@ -55,4 +58,5 @@ public class SellerOrderController {
         orderService.shipOrder(loginUser.getId(), id);
         return Result.success();
     }
+
 }

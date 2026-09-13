@@ -3,6 +3,7 @@ package com.example.project01.service.Impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.project01.common.BusinessException;
+import com.example.project01.common.ProductStatusEnum;
 import com.example.project01.common.ResultCode;
 import com.example.project01.entity.Cart;
 import com.example.project01.entity.Product;
@@ -16,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Cart operations enforcing buyer ownership and product availability.
+ */
 @Service
 @RequiredArgsConstructor
 public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements CartService {
@@ -34,7 +38,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements Ca
     @Transactional(rollbackFor = Exception.class)
     public void addCart(Long buyerId, Long productId, Integer num) {
         Product product = productService.getProductById(productId);
-        if (product == null || product.getStatus() != 1) {
+        if (product == null || product.getStatus() != ProductStatusEnum.ON_SALE.getCode()) {
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
         Cart existing = lambdaQuery()

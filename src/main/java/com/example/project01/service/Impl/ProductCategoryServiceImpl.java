@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.project01.cache.CacheNames;
 import com.example.project01.cache.CacheSupport;
 import com.example.project01.common.BusinessException;
+import com.example.project01.common.CategoryStatusEnum;
 import com.example.project01.entity.ProductCategory;
 import com.example.project01.mapper.ProductCategoryMapper;
 import com.example.project01.service.ProductCategoryService;
@@ -18,6 +19,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
+/**
+ * Product category service with cache read-through and cache eviction on writes.
+ */
 @Service
 @RequiredArgsConstructor
 public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMapper, ProductCategory>
@@ -31,7 +35,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
                 CacheNames.CATEGORY_LIST,
                 CacheNames.CATEGORY_LIST_KEY,
                 () -> lambdaQuery()
-                        .eq(ProductCategory::getStatus, 1)
+                .eq(ProductCategory::getStatus, CategoryStatusEnum.ENABLED.getCode())
                         .orderByAsc(ProductCategory::getSortOrder)
                         .list());
     }
@@ -49,7 +53,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "categoryList", allEntries = true)
+    @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
     public void addCategory(ProductCategory category) {
         if (lambdaQuery().eq(ProductCategory::getName, category.getName()).count() > 0) {
             throw new BusinessException("category name already exists");
@@ -59,14 +63,14 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "categoryList", allEntries = true)
+    @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
     public void updateCategory(ProductCategory category) {
         updateById(category);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "categoryList", allEntries = true)
+    @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
     public void updateStatus(Long id, Integer status) {
         update(new LambdaUpdateWrapper<ProductCategory>()
                 .eq(ProductCategory::getId, id)
@@ -75,7 +79,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "categoryList", allEntries = true)
+    @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
     public void deleteCategory(Long id) {
         removeById(id);
     }

@@ -33,3 +33,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Python ai-agent ###
+ai-agent/.venv/
+ai-agent/__pycache__/
+**/__pycache__/
+*.pyc
+ai-agent/data/vector/
+ai-agent/.env

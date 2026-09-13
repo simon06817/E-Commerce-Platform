@@ -6,6 +6,9 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
+/**
+ * Populates create/update timestamps automatically for MyBatis-Plus entities.
+ */
 @Component
 public class MyMetaObjectHandler implements MetaObjectHandler {
 

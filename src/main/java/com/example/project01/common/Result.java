@@ -2,6 +2,11 @@ package com.example.project01.common;
 
 import lombok.Data;
 
+/**
+ * Unified HTTP response envelope: code, message and payload.
+ *
+ * @param <T> payload type
+ */
 @Data
 public class Result<T> {
     private int code;

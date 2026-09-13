@@ -90,7 +90,8 @@ CREATE TABLE order_info (
   receiver_address varchar(255),
   create_time timestamp default current_timestamp,
   update_time timestamp default current_timestamp,
-  payment_time timestamp
+  payment_time timestamp,
+  complete_time timestamp
 );
 
 CREATE TABLE order_item (
@@ -123,4 +124,47 @@ CREATE TABLE order_event_record (
   payload varchar(2000),
   create_time timestamp default current_timestamp,
   unique (order_id, event_type)
+);
+
+CREATE TABLE product_review (
+  id bigint auto_increment primary key,
+  product_id bigint not null,
+  buyer_id bigint not null,
+  order_id bigint not null,
+  order_item_id bigint not null unique,
+  rating tinyint not null,
+  content varchar(500),
+  reply_content varchar(500),
+  reply_time timestamp,
+  create_time timestamp default current_timestamp,
+  update_time timestamp default current_timestamp
+);
+
+CREATE TABLE order_return (
+  id bigint auto_increment primary key,
+  order_id bigint not null,
+  order_item_id bigint not null unique,
+  buyer_id bigint not null,
+  seller_id bigint not null,
+  product_id bigint not null,
+  quantity int not null,
+  reason varchar(500) not null,
+  status tinyint default 0,
+  refund_amount decimal(10,2) not null,
+  handle_note varchar(500),
+  apply_time timestamp default current_timestamp,
+  handle_time timestamp
+);
+
+CREATE TABLE order_notification (
+  id bigint auto_increment primary key,
+  order_id bigint not null,
+  event_type varchar(50) not null,
+  recipient_id bigint not null,
+  recipient_role varchar(20) not null,
+  title varchar(100) not null,
+  content varchar(500) not null,
+  is_read tinyint default 0,
+  create_time timestamp default current_timestamp,
+  unique (order_id, event_type, recipient_role, recipient_id)
 );

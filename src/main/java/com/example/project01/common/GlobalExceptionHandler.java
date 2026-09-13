@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+/**
+ * Converts exceptions thrown by controllers and services into the unified
+ * {@link Result} envelope.
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {

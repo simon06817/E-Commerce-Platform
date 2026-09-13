@@ -4,6 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Checkout request. The idempotency key protects against duplicate submits.
+ */
 @Data
 public class OrderCreateRequest {
 

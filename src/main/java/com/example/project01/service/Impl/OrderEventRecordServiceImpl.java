@@ -7,6 +7,9 @@ import com.example.project01.service.OrderEventRecordService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
+/**
+ * Deduplicates consumed order events using the unique (order_id, event_type) key.
+ */
 @Service
 public class OrderEventRecordServiceImpl extends ServiceImpl<OrderEventRecordMapper, OrderEventRecord>
         implements OrderEventRecordService {

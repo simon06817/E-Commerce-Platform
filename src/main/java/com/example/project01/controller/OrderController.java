@@ -24,6 +24,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Buyer order endpoints: create, pay, cancel, confirm receipt and query.
+ */
 @Tag(name = "Orders", description = "buyer order management")
 @RestController
 @RequestMapping("/api/orders")

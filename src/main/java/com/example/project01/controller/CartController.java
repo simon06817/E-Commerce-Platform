@@ -25,6 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Buyer shopping cart endpoints. Buyer identity always comes from the JWT.
+ */
 @Tag(name = "Cart", description = "buyer cart management")
 @RestController
 @RequestMapping("/api/carts")

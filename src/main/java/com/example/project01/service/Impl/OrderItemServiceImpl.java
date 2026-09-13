@@ -6,6 +6,9 @@ import com.example.project01.mapper.OrderItemMapper;
 import com.example.project01.service.OrderItemService;
 import org.springframework.stereotype.Service;
 
+/**
+ * Default MyBatis-Plus service for order item snapshots.
+ */
 @Service
 public class OrderItemServiceImpl extends ServiceImpl<OrderItemMapper, OrderItem> implements OrderItemService {
 }

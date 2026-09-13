@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Serializes order domain events into outbox rows inside the current transaction.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

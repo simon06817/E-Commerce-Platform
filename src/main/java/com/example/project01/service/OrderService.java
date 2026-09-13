@@ -5,7 +5,12 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.project01.dto.OrderCreateRequest;
 import com.example.project01.entity.Order;
 import com.example.project01.vo.OrderVO;
+import com.example.project01.vo.SellerStatsVO;
 
+/**
+ * Buyer and seller order use cases, including idempotent creation, payment,
+ * cancellation, shipping and receipt confirmation.
+ */
 public interface OrderService extends IService<Order> {
 
     Page<Order> getOrderPage(Long buyerId, int current, int size, Integer status);
@@ -27,4 +32,12 @@ public interface OrderService extends IService<Order> {
     void shipOrder(Long sellerId, Long orderId);
 
     void confirmOrder(Long buyerId, Long orderId);
+
+    Page<Order> getAdminOrderPage(int current, int size, String orderNo, Long buyerId, Integer status);
+
+    OrderVO getAdminOrderDetail(Long orderId);
+
+    void forceCancelOrder(Long orderId);
+
+    SellerStatsVO getSellerStats(Long sellerId, String range);
 }

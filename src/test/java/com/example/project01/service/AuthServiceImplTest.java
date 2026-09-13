@@ -5,6 +5,7 @@ import com.example.project01.dto.LoginRequest;
 import com.example.project01.dto.RegisterRequest;
 import com.example.project01.entity.UserBuyer;
 import com.example.project01.security.JwtUtil;
+import com.example.project01.security.TokenStore;
 import com.example.project01.service.Impl.AuthServiceImpl;
 import com.example.project01.vo.LoginResponse;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class AuthServiceImplTest {
 
     @Mock
     private JwtUtil jwtUtil;
+
+    @Mock
+    private TokenStore tokenStore;
 
     @InjectMocks
     private AuthServiceImpl authService;

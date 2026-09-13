@@ -2,6 +2,9 @@ package com.example.project01.common;
 
 import lombok.Getter;
 
+/**
+ * Central catalogue of business and HTTP result codes.
+ */
 @Getter
 public enum ResultCode {
     SUCCESS(200, "success"),
@@ -20,7 +23,9 @@ public enum ResultCode {
     USERNAME_OR_PASSWORD_ERROR(1006, "username or password is wrong"),
     USER_ALREADY_EXISTS(1007, "username already exists"),
     PRODUCT_NOT_OWNED(1008, "product is not owned by current seller"),
-    INVALID_ROLE(1009, "invalid role");
+    INVALID_ROLE(1009, "invalid role"),
+    REVIEW_NOT_ALLOWED(1010, "only completed orders can be reviewed"),
+    REVIEW_ALREADY_EXISTS(1011, "this order item has already been reviewed");
 
     private final int code;
     private final String message;

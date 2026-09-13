@@ -27,6 +27,81 @@
 
 登录接口必须同时指定角色、用户名和密码，JWT 中携带 `role` 声明，接口通过 `@PreAuthorize` 校验权限。
 
+## 架构与时序
+
+### 系统架构
+
+```mermaid
+flowchart LR
+    UI["Frontend (Vue/React)"] -->|"REST + JWT"| API["Java Spring Boot API"]
+    UI -->|"/chat + JWT"| AGENT["Python Agent<br/>FastAPI + LangGraph"]
+    API --> MYSQL[("MySQL<br/>E-Commerce_Platform")]
+    API --> REDIS[("Redis<br/>Cache + Token")]
+    API --> RABBIT[("RabbitMQ")]
+    RABBIT --> CONSUMER["Java order event consumer"]
+    CONSUMER --> MYSQL
+    AGENT -->|"product/order/review/notification + JWT"| API
+    AGENT --> CHROMA[("Chroma<br/>RAG vector store")]
+    AGENT --> OLLAMA[("Ollama<br/>qwen3.5:0.8b")]
+```
+
+### 下单与 Outbox 时序
+
+```mermaid
+sequenceDiagram
+    participant B as Buyer
+    participant API as Java API
+    participant DB as MySQL
+    participant OB as order_outbox
+    participant MQ as RabbitMQ
+    participant C as Consumer
+    B->>API: POST /api/orders (idempotencyKey)
+    API->>DB: check idempotency key
+    API->>DB: insert order + items + stock update (transaction)
+    API->>OB: insert ORDER_CREATED in same transaction
+    API-->>B: order response
+    OB->>MQ: scheduled publisher sends pending event
+    MQ->>C: ORDER_CREATED
+    C->>DB: insert order_event_record (idempotent)
+    C->>DB: create buyer notification
+```
+
+### JWT 刷新与退出时序
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant A as Java Auth API
+    participant R as Redis
+    F->>A: POST /api/auth/login
+    A->>R: save refresh token (7 days)
+    A-->>F: access token (30 min) + refresh token
+    F->>A: POST /api/auth/refresh
+    A->>R: validate and rotate refresh token
+    A-->>F: new access + refresh token
+    F->>A: POST /api/auth/logout
+    A->>R: delete refresh token + blacklist access jti
+    A-->>F: success
+```
+
+### Agent 对话时序
+
+```mermaid
+sequenceDiagram
+    participant U as User/Frontend
+    participant P as Python Agent
+    participant J as Java API
+    participant V as Chroma
+    participant O as Ollama
+    U->>P: POST /chat (JWT + message)
+    P->>J: GET /api/auth/me
+    P->>V: RAG knowledge + product description search
+    P->>J: realtime product/order/notification facts
+    P->>O: LangGraph StateGraph + ReAct tools
+    O-->>P: answer or tool proposal
+    P-->>U: answer (or confirmation prompt)
+```
+
 ## 内置账号（密码均为 BCrypt 存储）
 
 | 用户名 | 密码 | 角色 |
@@ -38,6 +113,8 @@
 ## 数据库
 
 `sql/schema.sql` 和 `sql/seed.sql` 提供完整建表与种子数据，目标库为 `E-Commerce_Platform`，包含：
+
+`sql/demo_bulk_data.sql` 可批量生成 10 个商家（每个 10 个商品）、50 个买家的演示数据，商品在 5 个分类间平均分配。
 
 - `user_admin` / `user_buyer` / `user_seller`
 - `product_category` / `product`
@@ -59,6 +136,8 @@
 | 模块 | 路径 | 权限 |
 | --- | --- | --- |
 | 认证 | `POST /api/auth/login`、`POST /api/auth/register` | 公开 |
+| 令牌 | `POST /api/auth/refresh`、`POST /api/auth/logout` | 公开 |
+| 当前用户 | `GET /api/auth/me` | 已登录 |
 | 商品 | `GET /api/products`、`GET /api/products/{id}` | 公开 |
 | 商品管理 | `POST/PUT/DELETE /api/products/**` | SELLER（仅本人商品） |
 | 分类 | `GET /api/categories/**` | 公开 |
@@ -68,6 +147,20 @@
 | 用户管理 | `/api/admin/users/**` | ADMIN |
 | AI | `/api/ai/**` | 公开 |
 | 上传 | `POST /api/upload/image` | 已登录 |
+| 评价 | `POST /api/reviews`、`DELETE /api/reviews/{id}` | BUYER |
+| 评价查询 | `GET /api/products/{id}/reviews`、`/summary` | 公开 |
+| 个人资料 | `GET/PUT /api/profile`、`PUT /api/profile/password` | BUYER / SELLER |
+| 评价回复 | `GET /api/seller/reviews`、`PUT /api/seller/reviews/{id}/reply` | SELLER |
+| 管理员订单 | `GET /api/admin/orders`、`PUT /api/admin/orders/{id}/force-cancel` | ADMIN |
+| 卖家统计 | `GET /api/seller/stats?range=today/7d/30d/all` | SELLER |
+| 退货退款 | `/api/returns/**` | BUYER |
+| 卖家退货处理 | `/api/seller/returns/**` | SELLER |
+
+AI Agent（`ai-agent/`）：FastAPI + LangChain/LangGraph + Ollama，提供进程内短期会话记忆（每个用户一条会话，保留最近 20 条消息），回答前会先检索知识库、商品描述、实时库存价格和真实评价。
+
+登录后返回 30 分钟 access token 和 7 天 refresh token；refresh token 每次刷新后轮换，退出登录会把 access token 写入 Redis 黑名单并删除 refresh token。
+
+状态码统一由枚举维护并与数据库注释保持一致：`OrderStatusEnum`、`ProductStatusEnum`、`CategoryStatusEnum`、`ReturnStatusEnum`。
 
 API 文档（本地启动后）：`http://localhost:8080/doc.html`
 

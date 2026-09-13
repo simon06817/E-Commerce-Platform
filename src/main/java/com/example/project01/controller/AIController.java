@@ -8,6 +8,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Thin HTTP entry points for the Aliyun AI chat service.
+ */
 @Tag(name = "AI助手", description = "阿里云AI相关接口")
 @RestController
 @RequestMapping("/api/ai")

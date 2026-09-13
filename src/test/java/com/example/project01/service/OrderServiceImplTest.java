@@ -76,7 +76,7 @@ class OrderServiceImplTest {
 
         orderService.createOrder(1L, request);
 
-        verify(productService).decreaseStock(10L, 2);
+        verify(productService).decreaseStock(product, 2);
         verify(cartService).removeSelected(1L, List.of(5L));
         verify(orderEventService).publishOrderCreated(any(Order.class));
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);

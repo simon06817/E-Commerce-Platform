@@ -21,6 +21,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import java.io.IOException;
 
+/**
+ * Stateless JWT security configuration. Public endpoints stay open while all
+ * other API calls require a valid token and role.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -41,7 +45,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/**", "/api/ai/**", "/uploads/**").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/register",
+                                "/api/auth/refresh", "/api/auth/logout",
+                                "/api/ai/**", "/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
                         .requestMatchers("/doc.html", "/webjars/**", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html", "/favicon.ico").permitAll()

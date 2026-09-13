@@ -9,6 +9,9 @@ import com.example.project01.service.UserSellerService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+/**
+ * Default seller account service.
+ */
 @Service
 public class UserSellerServiceImpl extends ServiceImpl<UserSellerMapper, UserSeller> implements UserSellerService {
 

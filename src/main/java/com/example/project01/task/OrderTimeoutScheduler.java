@@ -7,6 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * Periodically closes unpaid orders that exceeded the configured timeout.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

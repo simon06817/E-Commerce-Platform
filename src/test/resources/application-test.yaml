@@ -37,7 +37,8 @@ app:
     enabled: false
   jwt:
     secret: ECommercePlatformJwtSecretKey2026ForInternshipProject
-    expire-hours: 24
+    access-expire-minutes: 30
+    refresh-expire-days: 7
   upload:
     dir: target/test-uploads
     url-prefix: /uploads/

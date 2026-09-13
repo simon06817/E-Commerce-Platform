@@ -15,11 +15,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Reads the Bearer token from each request, validates it and puts the
+ * authenticated {@link com.example.project01.common.LoginUser} into the
+ * Spring Security context.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
+    private final TokenStore tokenStore;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -29,6 +35,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             try {
                 LoginUser user = jwtUtil.parseToken(header.substring(7));
+                if (tokenStore.isBlacklisted(user.getJti())) {
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
                 List<SimpleGrantedAuthority> authorities =
                         List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
                 UsernamePasswordAuthenticationToken authentication =

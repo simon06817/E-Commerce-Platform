@@ -108,6 +108,7 @@ CREATE TABLE `order_info` (
     `create_time`      datetime       DEFAULT CURRENT_TIMESTAMP,
     `update_time`      datetime       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `payment_time`     datetime       DEFAULT NULL,
+    `complete_time`    datetime       DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_no` (`order_no`),
     UNIQUE KEY `uk_idempotency_key` (`idempotency_key`),
@@ -126,7 +127,8 @@ CREATE TABLE `order_item` (
     `subtotal`      decimal(10, 2) NOT NULL,
     `create_time`   datetime       DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_order_id` (`order_id`)
+    KEY `idx_order_id` (`order_id`),
+    KEY `idx_product_id` (`product_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE `order_outbox` (
@@ -150,4 +152,58 @@ CREATE TABLE `order_event_record` (
     `create_time` datetime     DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_event` (`order_id`, `event_type`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE `product_review` (
+    `id`            bigint       NOT NULL AUTO_INCREMENT,
+    `product_id`    bigint       NOT NULL,
+    `buyer_id`      bigint       NOT NULL,
+    `order_id`      bigint       NOT NULL,
+    `order_item_id` bigint       NOT NULL,
+    `rating`        tinyint      NOT NULL COMMENT '1-5',
+    `content`       varchar(500) DEFAULT NULL,
+    `reply_content` varchar(500) DEFAULT NULL,
+    `reply_time`    datetime     DEFAULT NULL,
+    `create_time`   datetime     DEFAULT CURRENT_TIMESTAMP,
+    `update_time`   datetime     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_order_item` (`order_item_id`),
+    KEY `idx_product_id` (`product_id`),
+    KEY `idx_buyer_id` (`buyer_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE `order_return` (
+    `id`            bigint         NOT NULL AUTO_INCREMENT,
+    `order_id`      bigint         NOT NULL,
+    `order_item_id` bigint         NOT NULL,
+    `buyer_id`      bigint         NOT NULL,
+    `seller_id`     bigint         NOT NULL,
+    `product_id`    bigint         NOT NULL,
+    `quantity`      int            NOT NULL,
+    `reason`        varchar(500)   NOT NULL,
+    `status`        tinyint        DEFAULT 0 COMMENT '0 applied, 1 approved/refunded, 2 rejected, 3 canceled',
+    `refund_amount` decimal(10, 2) NOT NULL,
+    `handle_note`   varchar(500)   DEFAULT NULL,
+    `apply_time`    datetime       DEFAULT CURRENT_TIMESTAMP,
+    `handle_time`   datetime       DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_order_item` (`order_item_id`),
+    KEY `idx_buyer_id` (`buyer_id`),
+    KEY `idx_seller_id` (`seller_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
+
+CREATE TABLE `order_notification` (
+    `id`             bigint       NOT NULL AUTO_INCREMENT,
+    `order_id`       bigint       NOT NULL,
+    `event_type`     varchar(50)  NOT NULL,
+    `recipient_id`   bigint       NOT NULL,
+    `recipient_role` varchar(20)  NOT NULL,
+    `title`          varchar(100) NOT NULL,
+    `content`        varchar(500) NOT NULL,
+    `is_read`        tinyint      DEFAULT 0,
+    `create_time`    datetime     DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_order_event_recipient`
+        (`order_id`, `event_type`, `recipient_role`, `recipient_id`),
+    KEY `idx_recipient` (`recipient_role`, `recipient_id`, `is_read`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;

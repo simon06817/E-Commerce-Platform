@@ -6,6 +6,9 @@ import com.example.project01.entity.Cart;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Buyer shopping cart operations.
+ */
 public interface CartService extends IService<Cart> {
 
     List<Cart> getCartList(Long buyerId);

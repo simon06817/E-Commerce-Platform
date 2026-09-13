@@ -7,6 +7,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 
+/**
+ * In-memory Guava bloom filter used to reject queries for product ids that do
+ * not exist, reducing cache penetration to the database.
+ */
 @Component
 public class ProductBloomFilter {
 

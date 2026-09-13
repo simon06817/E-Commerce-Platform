@@ -2,6 +2,10 @@ package com.example.project01.common;
 
 import lombok.Getter;
 
+/**
+ * Order lifecycle states. Service code must use these constants instead of
+ * using raw numeric status values.
+ */
 @Getter
 public enum OrderStatusEnum {
     UNPAID(0, "未付款"),

@@ -29,6 +29,9 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Public category queries plus administrator category maintenance.
+ */
 @Tag(name = "Product categories", description = "category tree and management")
 @RestController
 @RequestMapping("/api/categories")

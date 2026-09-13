@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Small single-flight lock abstraction. Uses Redis SETNX when Redis caching is
+ * enabled and falls back to an in-JVM lock for tests or local caching.
+ */
 @Component
 public class CacheLockService {
 

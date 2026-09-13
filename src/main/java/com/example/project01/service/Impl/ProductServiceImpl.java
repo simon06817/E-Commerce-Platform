@@ -8,6 +8,7 @@ import com.example.project01.cache.CacheNames;
 import com.example.project01.cache.CacheSupport;
 import com.example.project01.cache.ProductBloomFilter;
 import com.example.project01.common.BusinessException;
+import com.example.project01.common.ProductStatusEnum;
 import com.example.project01.common.ResultCode;
 import com.example.project01.dto.ProductRequest;
 import com.example.project01.entity.Product;
@@ -24,6 +25,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
+/**
+ * Product service with bloom-filter penetration protection, single-flight cache
+ * rebuild and atomic stock updates.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -53,6 +58,8 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     @Override
     public Product getProductById(Long id) {
+        // Bloom filter rejects ids that cannot exist, then read-through cache
+        // protects the database from hot-key rebuilds.
         if (!bloomFilter.mightContain(id)) {
             return null;
         }
@@ -75,14 +82,15 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         product.setStock(request.getStock());
         product.setCategoryId(request.getCategoryId());
         product.setMainImage(request.getMainImage());
-        product.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+        product.setStatus(request.getStatus() == null
+                ? ProductStatusEnum.ON_SALE.getCode() : request.getStatus());
         save(product);
         bloomFilter.add(product.getId());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "productDetail", key = "#id")
+    @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#id")
     public void updateProduct(Long sellerId, Long id, ProductRequest request) {
         Product existing = getById(id);
         if (existing == null) {
@@ -106,7 +114,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "productDetail", key = "#id")
+    @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#id")
     public void updateProductStatus(Long sellerId, Long id, Integer status) {
         Product existing = getById(id);
         if (existing == null) {
@@ -123,7 +131,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(cacheNames = "productDetail", key = "#id")
+    @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#id")
     public void deleteProduct(Long sellerId, Long id) {
         Product existing = getById(id);
         if (existing == null) {
@@ -142,30 +150,46 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         if (product == null) {
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
+        decreaseStock(product, quantity);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#product.id")
+    public void decreaseStock(Product product, Integer quantity) {
+        if (product == null || product.getId() == null) {
+            throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
+        }
+        // Early check gives a clear business error; the conditional UPDATE below
+        // is still the concurrency-safe guard.
         if (product.getStock() < quantity) {
             throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
         }
         boolean success = update(new LambdaUpdateWrapper<Product>()
-                .eq(Product::getId, productId)
+                .eq(Product::getId, product.getId())
                 .ge(Product::getStock, quantity)
-                .setSql("stock = stock - " + quantity));
+                .setSql("stock = stock - {0}", quantity));
         if (!success) {
+            if (getById(product.getId()) == null) {
+                throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
+            }
             throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
         }
         int newStock = product.getStock() - quantity;
-        refreshProductCacheAfterCommit(productId, product, newStock);
+        refreshProductCacheAfterCommit(product.getId(), product, newStock);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void increaseStock(Long productId, Integer quantity) {
+        // Used when an unpaid order is cancelled or times out.
         Product product = getById(productId);
         if (product == null) {
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
         boolean success = update(new LambdaUpdateWrapper<Product>()
                 .eq(Product::getId, productId)
-                .setSql("stock = stock + " + quantity));
+                .setSql("stock = stock + {0}", quantity));
         if (!success) {
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
@@ -173,6 +197,8 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     }
 
     private void refreshProductCacheAfterCommit(Long productId, Product product, int newStock) {
+        // Cache refresh happens after commit so a rolled-back transaction never
+        // leaves a misleading stock value in Redis.
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             return;
         }

@@ -13,6 +13,9 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Order header. Maps to {@code order_info}; status uses {@code OrderStatusEnum}.
+ */
 @Data
 @TableName("order_info")
 public class Order {
@@ -58,4 +61,7 @@ public class Order {
 
     @TableField("payment_time")
     private LocalDateTime payTime;
+
+    @TableField("complete_time")
+    private LocalDateTime completeTime;
 }

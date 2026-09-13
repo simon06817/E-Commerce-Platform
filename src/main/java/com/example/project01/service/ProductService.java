@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.project01.dto.ProductRequest;
 import com.example.project01.entity.Product;
 
+/**
+ * Product queries, seller-owned product management and stock changes.
+ */
 public interface ProductService extends IService<Product> {
 
     Page<Product> getProductPage(int current, int size, Long categoryId, String keyword, Integer status);
@@ -20,6 +23,8 @@ public interface ProductService extends IService<Product> {
     void deleteProduct(Long sellerId, Long id);
 
     void decreaseStock(Long productId, Integer quantity);
+
+    void decreaseStock(Product product, Integer quantity);
 
     void increaseStock(Long productId, Integer quantity);
 }

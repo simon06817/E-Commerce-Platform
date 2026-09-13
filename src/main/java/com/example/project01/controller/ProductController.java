@@ -25,6 +25,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Public product browsing and seller-owned product management endpoints.
+ */
 @Tag(name = "Products", description = "product browsing and seller management")
 @RestController
 @RequestMapping("/api/products")

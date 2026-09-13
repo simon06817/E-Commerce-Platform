@@ -13,6 +13,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+/**
+ * Scheduled publisher that moves local outbox messages to RabbitMQ and marks
+ * them as sent. Failed sends are retried in later scans.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor

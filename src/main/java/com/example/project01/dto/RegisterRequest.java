@@ -7,6 +7,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Self-registration payload for buyer and seller accounts.
+ */
 @Data
 public class RegisterRequest {
 

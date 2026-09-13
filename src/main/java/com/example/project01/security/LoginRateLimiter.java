@@ -7,6 +7,10 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Simple fixed-window rate limiter for the login endpoint. The key is usually
+ * client IP plus username, so one account cannot be brute-forced quickly.
+ */
 @Component
 public class LoginRateLimiter {
 

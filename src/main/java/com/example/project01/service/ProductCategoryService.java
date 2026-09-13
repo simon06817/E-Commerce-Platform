@@ -6,6 +6,9 @@ import com.example.project01.entity.ProductCategory;
 
 import java.util.List;
 
+/**
+ * Product category queries and administrator maintenance operations.
+ */
 public interface ProductCategoryService extends IService<ProductCategory> {
 
     List<ProductCategory> listEnabledCategories();

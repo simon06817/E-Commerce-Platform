@@ -12,6 +12,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * Seller account that owns products and ships orders containing them.
+ */
 @Data
 @TableName("user_seller")
 public class UserSeller {

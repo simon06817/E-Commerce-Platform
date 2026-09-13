@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.project01.entity.UserBuyer;
 
+/**
+ * Buyer account queries and pagination.
+ */
 public interface UserBuyerService extends IService<UserBuyer> {
 
     UserBuyer getByUsername(String username);

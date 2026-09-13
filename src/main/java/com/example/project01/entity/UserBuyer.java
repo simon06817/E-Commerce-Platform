@@ -7,12 +7,14 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * Buyer account used for cart, order and payment operations.
+ */
 @Data
 @TableName("user_buyer")
 public class UserBuyer {
