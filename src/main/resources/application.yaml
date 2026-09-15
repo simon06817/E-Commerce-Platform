@@ -80,9 +80,29 @@ aliyun:
     model: qwen-turbo
 
 logging:
+  pattern:
+    correlation: "[traceId=%X{traceId:-}] "
   level:
     root: info
     com.example.project01.mapper: warn
     org.mybatis: warn
     org.mybatis.spring: warn
     org.springframework.amqp: warn
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}

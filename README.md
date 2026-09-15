@@ -207,6 +207,22 @@ mvn test
 
 覆盖范围：JWT 生成解析、三角色登录、购物车下单全流程、库存扣减、权限拒绝、管理员接口。
 
+`RealMiddlewareIntegrationTest` 使用 Testcontainers 启动真实 MySQL 8.4、Redis 7.4 和
+RabbitMQ 3.13，验证 Redis 缓存、MySQL 下单事务、Outbox 发布、消息消费和通知副作用。
+本机需要运行 Docker；没有 Docker 时该组测试会自动跳过。
+
+## 可观测性
+
+Actuator 与 Micrometer 提供以下本地端点：
+
+- `GET /actuator/health`
+- `GET /actuator/info`
+- `GET /actuator/metrics`
+- `GET /actuator/prometheus`
+
+每个 HTTP 请求都会生成或复用 `X-Trace-Id` 响应头，并在日志的
+`logging.pattern.correlation` 中输出对应 `traceId`，便于串联请求日志。
+
 ## CI
 
 `.github/workflows/maven.yml` 在 push / PR 时自动执行 JDK 17 + `mvn test`。

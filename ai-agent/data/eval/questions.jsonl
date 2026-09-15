@@ -1,0 +1,10 @@
+{"id":"product-phone","question":"推荐一款5000到6000元左右的手机","type":"product","expected_product_ids":[1],"expected_keywords":["iPhone 15"]}
+{"id":"product-laptop","question":"想买一台适合开发的苹果笔记本","type":"product","expected_product_ids":[2],"expected_keywords":["MacBook Pro"]}
+{"id":"product-java-book","question":"有没有适合学习Java编程的书","type":"product","expected_product_ids":[3],"expected_keywords":["Java编程思想"]}
+{"id":"faq-shipping","question":"下单之后多久发货","type":"knowledge","expected_product_ids":[],"expected_keywords":["发货"]}
+{"id":"faq-payment","question":"项目支持哪些支付方式","type":"knowledge","expected_product_ids":[],"expected_keywords":["模拟支付","待支付"]}
+{"id":"faq-timeout","question":"未支付订单会自动取消吗","type":"knowledge","expected_product_ids":[],"expected_keywords":["取消","库存"]}
+{"id":"faq-stock","question":"取消订单后库存会恢复吗","type":"knowledge","expected_product_ids":[],"expected_keywords":["恢复","库存"]}
+{"id":"faq-realtime","question":"知识库里的商品价格可以当作实时价格吗","type":"knowledge","expected_product_ids":[],"expected_keywords":["实时","商品接口"]}
+{"id":"faq-confirm","question":"卖家发货后买家怎么完成订单","type":"knowledge","expected_product_ids":[],"expected_keywords":["确认收货","已完成"]}
+{"id":"product-category","question":"有没有电子产品可以推荐","type":"product","expected_product_ids":[1,2],"expected_keywords":["电子产品"]}

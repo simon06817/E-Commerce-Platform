@@ -41,3 +41,4 @@ ai-agent/__pycache__/
 *.pyc
 ai-agent/data/vector/
 ai-agent/.env
+ai-agent/data/eval/reports/

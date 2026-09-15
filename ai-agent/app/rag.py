@@ -37,16 +37,25 @@ def build_vector_store() -> Chroma:
     store = _vector_store(config.kb_collection)
 
     texts = []
+    metadatas = []
     ids = []
     for file in kb_path.glob("*.txt"):
         chunks = splitter.split_text(file.read_text(encoding="utf-8"))
         for index, chunk in enumerate(chunks):
             texts.append(chunk)
+            metadatas.append(
+                {
+                    "source": file.name,
+                    "source_type": "knowledge",
+                    "chunk_index": index,
+                    "chunk_count": len(chunks),
+                }
+            )
             # 稳定 id 让重复执行脚本时覆盖旧数据。
             ids.append(f"{file.name}-{index}")
 
     if texts:
-        store.add_texts(texts=texts, ids=ids)
+        store.add_texts(texts=texts, metadatas=metadatas, ids=ids)
     return store
 
 
@@ -106,7 +115,14 @@ def search_structured(query: str, k: int = 3) -> dict[str, list[dict[str, Any]]]
     """返回结构化的静态知识与商品检索结果，供确定性前置检索使用。"""
     knowledge = []
     for doc in _vector_store(config.kb_collection).similarity_search(query, k=k):
-        knowledge.append({"content": doc.page_content})
+        metadata = doc.metadata or {}
+        knowledge.append(
+            {
+                "content": doc.page_content,
+                "source": metadata.get("source", "knowledge"),
+                "source_type": metadata.get("source_type", "knowledge"),
+            }
+        )
 
     products = []
     for doc in _vector_store(config.product_collection).similarity_search(query, k=k):
@@ -117,6 +133,8 @@ def search_structured(query: str, k: int = 3) -> dict[str, list[dict[str, Any]]]
                 "name": metadata.get("name"),
                 "category_name": metadata.get("category_name"),
                 "content": doc.page_content,
+                "source": f"product:{metadata.get('product_id')}",
+                "source_type": "product",
             }
         )
     return {"knowledge": knowledge, "products": products}
@@ -127,10 +145,10 @@ def search(query: str, k: int = 3) -> str:
     result = search_structured(query, k=k)
     parts = []
     for item in result["knowledge"]:
-        parts.append(f"[knowledge] {item['content']}")
+        parts.append(f"[knowledge source={item['source']}] {item['content']}")
     for item in result["products"]:
         parts.append(
-            f"[product product_id={item['product_id']} "
+            f"[product source={item['source']} product_id={item['product_id']} "
             f"category={item['category_name']}] {item['content']}"
         )
     return "\n\n".join(parts)

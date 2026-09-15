@@ -71,3 +71,27 @@ python scripts/test_chat.py "find me a phone under 6000"
 ```
 
 The test script logs in as `buyer01`, then sends the JWT to the AI service.
+
+## Evaluation
+
+Run deterministic retrieval metrics without calling the Java backend:
+
+```bash
+python scripts/evaluate_agent.py --mode retrieval --top-k 3
+```
+
+Run retrieval plus local Ollama answer evaluation:
+
+```bash
+python scripts/evaluate_agent.py --mode both --top-k 3
+```
+
+The report includes product `Hit@K`, `Recall@K`, `MRR`, keyword recall,
+retrieved sources and optional answer keyword coverage. The dataset lives in
+`data/eval/questions.jsonl`.
+
+Run the metric unit tests without Ollama or Chroma:
+
+```bash
+python -m unittest discover -s tests -v
+```
