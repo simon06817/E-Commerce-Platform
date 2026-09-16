@@ -1,0 +1,98 @@
+:root {
+  font-family:
+    Inter, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  color: #2f241f;
+  background: #fff8f1;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --bg: #fff8f1;
+  --surface: #fffdfa;
+  --surface-strong: #fff2e6;
+  --primary: #e86f3a;
+  --primary-dark: #c85224;
+  --primary-soft: #ffe2cf;
+  --accent: #2f8f83;
+  --accent-soft: #dff4ef;
+  --text: #2f241f;
+  --muted: #7b665c;
+  --line: #efd6c5;
+  --danger: #cf4d3f;
+  --shadow: 0 14px 36px rgba(127, 74, 42, 0.09);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  background: var(--bg);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page {
+  min-height: 100vh;
+  padding-bottom: 88px;
+}
+
+.page-inner {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.surface {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.price {
+  color: var(--primary-dark);
+  font-weight: 800;
+}
+
+.price::before {
+  content: "¥";
+  margin-right: 2px;
+  font-size: 0.72em;
+}
+
+.empty-block {
+  padding: 48px 20px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .page-inner {
+    width: min(100% - 24px, 1120px);
+  }
+}

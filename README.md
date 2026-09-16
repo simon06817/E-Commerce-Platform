@@ -138,7 +138,7 @@ sequenceDiagram
 | 认证 | `POST /api/auth/login`、`POST /api/auth/register` | 公开 |
 | 令牌 | `POST /api/auth/refresh`、`POST /api/auth/logout` | 公开 |
 | 当前用户 | `GET /api/auth/me` | 已登录 |
-| 商品 | `GET /api/products`、`GET /api/products/{id}` | 公开 |
+| 商品 | `GET /api/products`、`GET /api/products/{id}` | 公开，关键词支持商品名或唯一店铺名 |
 | 商品管理 | `POST/PUT/DELETE /api/products/**` | SELLER（仅本人商品） |
 | 分类 | `GET /api/categories/**` | 公开 |
 | 分类管理 | `POST/PUT/DELETE /api/categories/**` | ADMIN |

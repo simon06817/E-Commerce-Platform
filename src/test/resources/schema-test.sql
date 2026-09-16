@@ -43,6 +43,8 @@ CREATE TABLE user_seller (
   deleted tinyint default 0
 );
 
+CREATE INDEX idx_user_seller_shop_name ON user_seller(shop_name);
+
 CREATE TABLE product_category (
   id bigint auto_increment primary key,
   name varchar(50) not null,

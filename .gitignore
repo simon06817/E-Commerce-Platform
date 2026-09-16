@@ -42,3 +42,9 @@ ai-agent/__pycache__/
 ai-agent/data/vector/
 ai-agent/.env
 ai-agent/data/eval/reports/
+
+### Frontend ###
+frontend/node_modules/
+frontend/dist/
+frontend/.pnpm-store/
+.pnpm-store/

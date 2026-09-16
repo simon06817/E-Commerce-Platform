@@ -14,6 +14,8 @@ public interface ProductService extends IService<Product> {
 
     Product getProductById(Long id);
 
+    Product getProductDetail(Long id);
+
     void createProduct(Long sellerId, ProductRequest request);
 
     void updateProduct(Long sellerId, Long id, ProductRequest request);

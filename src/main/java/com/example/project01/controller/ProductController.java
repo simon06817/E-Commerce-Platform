@@ -50,7 +50,7 @@ public class ProductController {
     @Operation(summary = "Product detail", description = "public")
     @GetMapping("/{id}")
     public Result<Product> getById(@PathVariable @NotNull Long id) {
-        Product product = productService.getProductById(id);
+        Product product = productService.getProductDetail(id);
         if (product == null) {
             return Result.error(ResultCode.PRODUCT_NOT_EXIST);
         }

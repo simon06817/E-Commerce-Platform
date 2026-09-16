@@ -31,6 +31,9 @@ class ProductServiceImplTest {
     @Mock
     private CacheSupport cacheSupport;
 
+    @Mock
+    private UserSellerService userSellerService;
+
     @InjectMocks
     private ProductServiceImpl productService;
 

@@ -51,6 +51,12 @@ public class Product {
     @NotNull(message = "product status must not be null")
     private Integer status;
 
+    /**
+     * Display-only shop name resolved from user_seller for list/detail responses.
+     */
+    @TableField(exist = false)
+    private String sellerName;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

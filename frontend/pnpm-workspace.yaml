@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild
+storeDir: D:/frontend-need/pnpm-store
+verifyDepsBeforeRun: false

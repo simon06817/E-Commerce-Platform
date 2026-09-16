@@ -12,8 +12,10 @@ import com.example.project01.common.ProductStatusEnum;
 import com.example.project01.common.ResultCode;
 import com.example.project01.dto.ProductRequest;
 import com.example.project01.entity.Product;
+import com.example.project01.entity.UserSeller;
 import com.example.project01.mapper.ProductMapper;
 import com.example.project01.service.ProductService;
+import com.example.project01.service.UserSellerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -24,6 +26,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Product service with bloom-filter penetration protection, single-flight cache
@@ -36,6 +44,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
 
     private final ProductBloomFilter bloomFilter;
     private final CacheSupport cacheSupport;
+    private final UserSellerService userSellerService;
 
     @Override
     public Page<Product> getProductPage(int current, int size, Long categoryId, String keyword, Integer status) {
@@ -48,12 +57,20 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             wrapper.eq(Product::getStatus, status);
         }
         if (StringUtils.hasText(keyword)) {
-            wrapper.and(w -> w.like(Product::getName, keyword)
-                    .or()
-                    .like(Product::getDescription, keyword));
+            String normalizedKeyword = keyword.trim();
+            Long sellerId = resolveSellerId(normalizedKeyword);
+            if (sellerId != null) {
+                wrapper.eq(Product::getSellerId, sellerId);
+            } else {
+                wrapper.and(w -> w.like(Product::getName, normalizedKeyword)
+                        .or()
+                        .like(Product::getDescription, normalizedKeyword));
+            }
         }
         wrapper.orderByDesc(Product::getCreateTime);
-        return page(page, wrapper);
+        Page<Product> result = page(page, wrapper);
+        enrichSellerNames(result.getRecords());
+        return result;
     }
 
     @Override
@@ -68,6 +85,62 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 CacheNames.PRODUCT_NULL,
                 String.valueOf(id),
                 () -> getById(id));
+    }
+
+    @Override
+    public Product getProductDetail(Long id) {
+        Product product = getProductById(id);
+        if (product != null) {
+            enrichSellerNames(List.of(product));
+        }
+        return product;
+    }
+
+    private Long resolveSellerId(String keyword) {
+        // Exact match takes precedence so a complete shop name always behaves
+        // deterministically and never mixes products from multiple sellers.
+        List<UserSeller> exactMatches = userSellerService.lambdaQuery()
+                .select(UserSeller::getId)
+                .apply("LOWER(shop_name) = LOWER({0})", keyword)
+                .list();
+        if (exactMatches.size() == 1) {
+            return exactMatches.get(0).getId();
+        }
+        if (exactMatches.size() > 1) {
+            return null;
+        }
+
+        // Prefix matching is allowed only when it resolves to one seller.
+        List<UserSeller> prefixMatches = userSellerService.lambdaQuery()
+                .select(UserSeller::getId)
+                .apply("LOWER(shop_name) LIKE CONCAT(LOWER({0}), '%')", keyword)
+                .list();
+        return prefixMatches.size() == 1 ? prefixMatches.get(0).getId() : null;
+    }
+
+    private void enrichSellerNames(List<Product> products) {
+        if (products == null || products.isEmpty()) {
+            return;
+        }
+        Set<Long> sellerIds = products.stream()
+                .map(Product::getSellerId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (sellerIds.isEmpty()) {
+            return;
+        }
+        Map<Long, UserSeller> sellersById = userSellerService.lambdaQuery()
+                .in(UserSeller::getId, sellerIds)
+                .list()
+                .stream()
+                .collect(Collectors.toMap(UserSeller::getId, Function.identity()));
+        for (Product product : products) {
+            UserSeller seller = sellersById.get(product.getSellerId());
+            if (seller != null) {
+                product.setSellerName(StringUtils.hasText(seller.getShopName())
+                        ? seller.getShopName() : seller.getUsername());
+            }
+        }
     }
 
     @Override

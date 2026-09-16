@@ -54,6 +54,9 @@ CREATE TABLE `user_seller` (
     UNIQUE KEY `uk_username` (`username`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
+CREATE INDEX `idx_user_seller_shop_name_lower`
+    ON `user_seller` ((LOWER(`shop_name`)));
+
 CREATE TABLE `product_category` (
     `id`          bigint      NOT NULL AUTO_INCREMENT,
     `name`        varchar(50) NOT NULL,

@@ -133,6 +133,22 @@ class RealMiddlewareIntegrationTest {
     }
 
     @Test
+    void realMysqlShopSearchReturnsOnlyMatchingSellerProducts() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/products")
+                        .param("keyword", "Tech Store")
+                        .param("status", "1"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode page = objectMapper.readTree(result.getResponse().getContentAsString()).path("data");
+        assertEquals(3, page.path("total").asInt());
+        for (JsonNode product : page.path("records")) {
+            assertEquals(1L, product.path("sellerId").asLong());
+            assertEquals("Tech Store", product.path("sellerName").asText());
+        }
+    }
+
+    @Test
     void realRabbitMqPublishesOutboxAndCreatesNotifications() throws Exception {
         String token = login("BUYER", "buyer01", "123456");
         addToCart(token, 1, 1);
