@@ -18,12 +18,13 @@ public class OutboxMessageServiceImpl extends ServiceImpl<OutboxMessageMapper, O
         implements OutboxMessageService {
 
     @Override
-    public void savePending(Long orderId, String eventType, String payload) {
+    public void savePending(Long orderId, String eventType, String payload, String traceId) {
         // Written in the same transaction as the order, so an event cannot be lost.
         OutboxMessage message = new OutboxMessage();
         message.setOrderId(orderId);
         message.setEventType(eventType);
         message.setPayload(payload);
+        message.setTraceId(traceId);
         message.setStatus(OutboxStatusEnum.PENDING.getCode());
         message.setRetryCount(0);
         save(message);

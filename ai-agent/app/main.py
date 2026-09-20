@@ -14,7 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app import metrics
 from app.agent import remember_exchange, run_agent
+from app.api_catalog import api_catalog_facts
 from app.config import config
 from app.rag import search_knowledge, search_products
 from app.tools import (
@@ -22,9 +24,12 @@ from app.tools import (
     end_action_collection,
     execute_proposed_action,
     proposed_actions,
+    reset_user_role,
     reset_user_token,
+    set_user_role,
     set_user_token,
 )
+from app.web_search import perform_web_search
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -81,6 +86,13 @@ _IDENTITY_QUESTION_KEYWORDS = (
 _DEEP_PRODUCT_KEYWORDS = (
     "推荐", "搜索", "查找", "商品详情", "价格", "多少钱", "分类",
     "评价", "描述", "比较", "挑选", "怎么样",
+)
+_WEB_SEARCH_KEYWORDS = (
+    "联网", "上网", "网上查", "搜索一下", "搜一下", "查一下网上",
+    "最新消息", "实时信息", "新闻", "行业行情", "外部资料",
+)
+_API_CATALOG_KEYWORDS = (
+    "接口", "api", "后端", "调用", "权限", "能做什么", "有哪些功能",
 )
 _ORDER_STATUS_TEXT = {
     0: "待付款",
@@ -283,23 +295,73 @@ def _product_facts(item: dict) -> list[str]:
     return facts
 
 
+def _web_search_facts(question: str) -> list[str]:
+    """Fetch Tavily evidence only for questions that explicitly need the web."""
+    metrics.increment("agent.web_search.calls")
+    with metrics.timer("agent.web_search_ms"):
+        raw = perform_web_search(question, config.tavily_max_results)
+    try:
+        body = json.loads(raw)
+    except Exception:
+        return [f"外部联网搜索返回：{raw}"]
+    if body.get("error"):
+        metrics.increment("agent.web_search.failures")
+        return [f"外部联网搜索不可用：{body['error']}"]
+
+    facts = []
+    answer = body.get("answer")
+    if answer:
+        facts.append(f"外部联网搜索摘要：{answer}")
+    for item in body.get("results", [])[:3]:
+        content = str(item.get("content") or "").strip()
+        facts.append(
+            "外部联网搜索结果："
+            f"标题={item.get('title')}；来源={item.get('url')}；"
+            f"内容={content[:500]}"
+        )
+    return facts
+
+
+def _needs_web_search(question: str) -> bool:
+    return any(keyword in question for keyword in _WEB_SEARCH_KEYWORDS)
+
+
+def _needs_api_catalog(question: str) -> bool:
+    return any(keyword in question.lower() for keyword in _API_CATALOG_KEYWORDS)
+
+
 def _retrieve_facts(question: str, authorization: str,
                     role: str | None) -> tuple[list[str], list[dict]]:
     """执行确定性前置检索：静态知识 + 商品描述 + 实时信息 + 评价。"""
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        knowledge_future = executor.submit(search_knowledge, question, 3)
-        product_future = (
-            executor.submit(search_products, question, 3)
-            if _needs_product_retrieval(question, role)
-            else None
-        )
-        account_future = executor.submit(
-            _account_facts, question, authorization, role)
+    metrics.increment("agent.retrieval.calls")
+    with metrics.timer("agent.retrieval_ms"):
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            knowledge_future = executor.submit(search_knowledge, question, 3)
+            product_future = (
+                executor.submit(search_products, question, 3)
+                if _needs_product_retrieval(question, role)
+                else None
+            )
+            web_future = (
+                executor.submit(_web_search_facts, question)
+                if _needs_web_search(question)
+                else None
+            )
+            account_future = executor.submit(
+                _account_facts, question, authorization, role)
 
-        knowledge = knowledge_future.result()
-        product_hits = product_future.result() if product_future else []
-        facts = account_future.result()
+            knowledge = knowledge_future.result()
+            product_hits = product_future.result() if product_future else []
+            web_facts = web_future.result() if web_future else []
+            facts = account_future.result()
 
+    metrics.increment("agent.retrieval.knowledge_hits", len(knowledge))
+    metrics.increment("agent.retrieval.product_hits", len(product_hits))
+    if not knowledge and not product_hits and not web_facts:
+        metrics.increment("agent.retrieval.empty")
+    if _needs_api_catalog(question):
+        facts.extend(api_catalog_facts(question, role))
+    facts.extend(web_facts)
     for item in knowledge:
         facts.append(f"知识库：{item['content']}")
 
@@ -782,10 +844,18 @@ def health():
     return {"status": status, "dependencies": dependencies}
 
 
+@app.get("/metrics")
+def metrics_snapshot():
+    """Expose lightweight in-process Agent counters and latency summaries."""
+    return metrics.snapshot()
+
+
 @app.post("/chat")
 async def chat(request: ChatRequest, authorization: str | None = Header(default=None)):
     """兼容非流式调用。"""
-    return await asyncio.to_thread(_handle_chat, request, authorization)
+    metrics.increment("agent.requests.non_stream")
+    with metrics.timer("agent.request_ms"):
+        return await asyncio.to_thread(_handle_chat, request, authorization)
 
 
 def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
@@ -798,6 +868,7 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
     if pending:
         if _is_cancel(question):
             _pending_actions.pop(thread_id, None)
+            metrics.increment("agent.actions.cancelled")
             answer = "已取消该操作。"
             memory_size = remember_exchange(thread_id, question, answer)
             _memory_sizes[thread_id] = memory_size
@@ -819,9 +890,12 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
                 _pending_actions.pop(thread_id, None)
             token_ctx = set_user_token(authorization)
             try:
-                raw = execute_proposed_action(action)
+                with metrics.timer("agent.action_execution_ms"):
+                    raw = execute_proposed_action(action)
                 answer = _format_action_result(action, raw)
+                metrics.increment("agent.actions.confirmed")
             except Exception:
+                metrics.increment("agent.actions.failed")
                 logger.exception("confirmed agent action failed: %s", action)
                 answer = "操作执行失败，请稍后重试。"
             finally:
@@ -909,13 +983,17 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
         facts, products = [], []
 
     token_ctx = set_user_token(authorization)
+    role_ctx = set_user_role(user.get("role"))
     action_ctx = begin_action_collection()
     actions: list[dict[str, Any]] = []
     result: dict[str, Any] = {}
     try:
-        result = run_agent(thread_id, question, facts, user.get("role"))
+        metrics.increment("agent.llm.calls")
+        with metrics.timer("agent.llm_ms"):
+            result = run_agent(thread_id, question, facts, user.get("role"))
         actions = proposed_actions()
     except Exception:
+        metrics.increment("agent.llm.failures")
         logger.exception("agent execution failed for thread %s", thread_id)
         memory_size = _memory_sizes.get(thread_id, 0)
         return _response(
@@ -926,6 +1004,7 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
         )
     finally:
         end_action_collection(action_ctx)
+        reset_user_role(role_ctx)
         reset_user_token(token_ctx)
 
     _normalize_actions(question, actions)
@@ -933,6 +1012,7 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
     _memory_sizes[thread_id] = memory_size
     if actions:
         _set_pending_actions(thread_id, actions)
+        metrics.increment("agent.actions.proposed")
         answer = _confirmation_text(actions[0])
     else:
         answer = result.get("answer", "AI 助手暂时无法生成回答")
@@ -945,6 +1025,8 @@ def _stream_line(payload: dict) -> str:
 
 
 async def _chat_event_stream(request: ChatRequest, authorization: str | None):
+    metrics.increment("agent.requests.stream")
+    request_started = time.perf_counter()
     yield _stream_line({"type": "status", "text": "正在读取账户和商品数据…"})
     try:
         result = await asyncio.to_thread(_handle_chat, request, authorization)
@@ -967,6 +1049,10 @@ async def _chat_event_stream(request: ChatRequest, authorization: str | None):
         yield _stream_line({"type": "delta", "text": answer[start:start + 4]})
         await asyncio.sleep(0.012)
     yield _stream_line({"type": "done", "data": result})
+    metrics.observe_ms(
+        "agent.request_ms",
+        (time.perf_counter() - request_started) * 1000,
+    )
 
 
 @app.post("/chat/stream")

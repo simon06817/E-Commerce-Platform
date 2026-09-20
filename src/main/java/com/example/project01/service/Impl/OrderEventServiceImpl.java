@@ -1,6 +1,7 @@
 package com.example.project01.service.Impl;
 
 import com.example.project01.entity.Order;
+import com.example.project01.observability.TraceContext;
 import com.example.project01.service.OrderEventService;
 import com.example.project01.service.OutboxMessageService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -44,9 +45,11 @@ public class OrderEventServiceImpl implements OrderEventService {
         payload.put("totalAmount", order.getTotalAmount());
         try {
             String json = objectMapper.writeValueAsString(payload);
-            outboxMessageService.savePending(order.getId(), eventType, json);
+            outboxMessageService.savePending(
+                    order.getId(), eventType, json, TraceContext.currentOrCreate());
         } catch (JsonProcessingException e) {
             log.error("serialize order event payload failed, orderId={}", order.getId(), e);
+            throw new IllegalStateException("failed to serialize order event payload", e);
         }
     }
 }

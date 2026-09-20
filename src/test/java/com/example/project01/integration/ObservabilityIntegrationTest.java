@@ -2,6 +2,8 @@ package com.example.project01.integration;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,5 +33,24 @@ class ObservabilityIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "jvm_memory_used_bytes")));
+    }
+
+    @Test
+    void businessMetricsExposeOrderAndCacheOutcomes() throws Exception {
+        String token = login("BUYER", "buyer01", "123456");
+        addToCart(token, 1, 1);
+
+        mockMvc.perform(get("/api/products/1"))
+                .andExpect(status().isOk());
+        createOrderResult(token, "metrics-" + UUID.randomUUID());
+
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "ecommerce_orders_checkout_total")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "ecommerce_cache_access_total")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "ecommerce_stock_changes_total")));
     }
 }

@@ -1,6 +1,6 @@
 import unittest
 
-from app.main import _needs_product_retrieval
+from app.main import _needs_api_catalog, _needs_product_retrieval, _needs_web_search
 
 
 class AgentRoutingTest(unittest.TestCase):
@@ -27,6 +27,14 @@ class AgentRoutingTest(unittest.TestCase):
                 "BUYER",
             )
         )
+
+    def test_explicit_external_search_is_detected(self):
+        self.assertTrue(_needs_web_search("上网搜索最新机械键盘行情"))
+        self.assertFalse(_needs_web_search("查询我的购物车"))
+
+    def test_api_catalog_is_loaded_only_for_capability_questions(self):
+        self.assertTrue(_needs_api_catalog("这个项目有哪些后端接口"))
+        self.assertFalse(_needs_api_catalog("查询我的购物车"))
 
 
 if __name__ == "__main__":

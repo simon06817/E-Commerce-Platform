@@ -228,4 +228,29 @@ class OrderLifecycleIntegrationTest extends IntegrationTestSupport {
             productService.deleteProduct(2L, secondSellerProduct.getId());
         }
     }
+
+    @Test
+    void orderPagesReturnBatchDetailsWithoutExtraDetailRequests() throws Exception {
+        String buyerToken = login("BUYER", "buyer01", "123456");
+        addToCart(buyerToken, 1, 1);
+        createOrder(buyerToken);
+
+        MvcResult buyerPage = mockMvc.perform(get("/api/orders/page-details")
+                        .header("Authorization", "Bearer " + buyerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode buyerFirst = data(buyerPage).path("records").get(0);
+        assertEquals(1, buyerFirst.path("items").size());
+        assertEquals("buyer01", buyerFirst.path("buyerUsername").asText());
+        assertEquals("Tech Store", buyerFirst.path("shopNames").get(0).asText());
+
+        String sellerToken = login("SELLER", "seller01", "123456");
+        MvcResult sellerPage = mockMvc.perform(get("/api/seller/orders/page-details")
+                        .header("Authorization", "Bearer " + sellerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode sellerFirst = data(sellerPage).path("records").get(0);
+        assertEquals(1L, sellerFirst.path("sellerId").asLong());
+        assertEquals(1, sellerFirst.path("items").size());
+    }
 }

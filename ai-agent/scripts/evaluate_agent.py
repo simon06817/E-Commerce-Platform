@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.agent import run_agent
+from app.agent import detect_intent, run_agent
 from app.rag import search_structured
 
 
@@ -50,6 +50,17 @@ def _keyword_recall(text: str, keywords: list[str]) -> float:
     normalized = text.lower()
     matches = sum(1 for keyword in keywords if keyword.lower() in normalized)
     return matches / len(keywords)
+
+
+def evaluate_routing(case: dict[str, Any]) -> dict[str, Any]:
+    """Evaluate deterministic intent routing when an expected intent is present."""
+    expected = case.get("expected_intent")
+    actual = detect_intent(case["question"])
+    return {
+        "intent": actual,
+        "expected_intent": expected,
+        "intent_ok": None if expected is None else float(actual == expected),
+    }
 
 
 def evaluate_retrieval(
@@ -100,6 +111,7 @@ def evaluate_retrieval(
             for item in result.get(group, [])[:top_k]
             if item.get("source")
         }),
+        **evaluate_routing(case),
     }
 
 
@@ -116,17 +128,32 @@ def summarize(details: list[dict[str, Any]]) -> dict[str, Any]:
         "recall_at_k": _average([item["recall_at_k"] for item in details]),
         "mrr": _average([item["reciprocal_rank"] for item in details]),
         "keyword_recall": _average([item["keyword_recall"] for item in details]),
+        "intent_accuracy": _average([
+            item.get("intent_ok") for item in details
+        ]),
     }
 
 
 def _answer_metrics(case: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     answer = str(result.get("answer", ""))
     recall = _keyword_recall(answer, case.get("expected_keywords", []))
+    actual_tools = set(result.get("tool_names", []))
+    expected_tools = set(case.get("expected_tools", []))
+    forbidden_tools = set(case.get("forbidden_tools", []))
     return {
         "answer_keyword_recall": recall,
         "answer_ok": 1.0 if recall == 1.0 else 0.0,
         "answer": answer,
         "memory_size": result.get("memory_size", 0),
+        "tool_names": sorted(actual_tools),
+        "expected_tools": sorted(expected_tools),
+        "tool_selection_ok": (
+            None if not expected_tools
+            else float(expected_tools.issubset(actual_tools))
+        ),
+        "forbidden_tool_violation": float(
+            bool(forbidden_tools.intersection(actual_tools))
+        ),
     }
 
 
@@ -183,6 +210,12 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
                 ]),
                 "keyword_recall": _average([
                     item["answer_keyword_recall"] for item in answer_details
+                ]),
+                "tool_selection_accuracy": _average([
+                    item["tool_selection_ok"] for item in answer_details
+                ]),
+                "forbidden_tool_violation_rate": _average([
+                    item["forbidden_tool_violation"] for item in answer_details
                 ]),
             },
             "details": answer_details,

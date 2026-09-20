@@ -43,6 +43,15 @@
         <el-table-column label="下单时间" width="170">
           <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
         </el-table-column>
+        <el-table-column label="付款时间" width="170">
+          <template #default="{ row }">{{ formatDate(row.payTime) }}</template>
+        </el-table-column>
+        <el-table-column label="发货时间" width="170">
+          <template #default="{ row }">{{ formatDate(row.shipTime) }}</template>
+        </el-table-column>
+        <el-table-column label="确认/完成时间" width="180">
+          <template #default="{ row }">{{ formatDate(row.completeTime) }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="orderStatus(row.status).type" effect="plain">
@@ -115,6 +124,9 @@
           <el-descriptions-item label="发货时间">
             {{ formatDate(detail.shipTime) }}
           </el-descriptions-item>
+          <el-descriptions-item label="确认/完成时间">
+            {{ formatDate(detail.completeTime) }}
+          </el-descriptions-item>
         </el-descriptions>
 
         <div class="detail-items">
@@ -169,22 +181,13 @@ async function loadOrders() {
     if (statusTab.value !== 'all') {
       params.status = Number(statusTab.value)
     }
-    const data = await sellerOrderApi.page(params)
+    const data = await sellerOrderApi.pageDetails(params)
     orders.value = data.records || []
     total.value = data.total || 0
 
-    const details = await Promise.all(
-      orders.value.map(async (order) => {
-        try {
-          return [order.id, await sellerOrderApi.detail(order.id)]
-        } catch {
-          return [order.id, { items: [] }]
-        }
-      })
-    )
     Object.keys(orderDetails).forEach((key) => delete orderDetails[key])
-    for (const [id, item] of details) {
-      orderDetails[id] = item
+    for (const order of orders.value) {
+      orderDetails[order.id] = order
     }
   } catch (error) {
     ElMessage.error(error.message || '订单加载失败')

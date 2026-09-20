@@ -6,10 +6,14 @@ from typing import Any
 import httpx
 from langchain_core.tools import tool
 
+from app import metrics
+from app.api_catalog import search_api_catalog
 from app.config import config
+from app.web_search import perform_web_search
 
 # 当前请求的 JWT 与“待用户确认的写操作”只存在于本次请求上下文。
 _user_token: ContextVar[str | None] = ContextVar("user_token", default=None)
+_user_role: ContextVar[str | None] = ContextVar("user_role", default=None)
 _proposed_actions: ContextVar[list[dict[str, Any]] | None] = ContextVar(
     "proposed_actions", default=None
 )
@@ -64,6 +68,16 @@ def reset_user_token(token_ctx) -> None:
     _user_token.reset(token_ctx)
 
 
+def set_user_role(role: str | None):
+    """保存当前请求角色，供 API 目录按权限过滤。"""
+    return _user_role.set(role)
+
+
+def reset_user_role(role_ctx) -> None:
+    """请求结束后清理角色上下文。"""
+    _user_role.reset(role_ctx)
+
+
 def begin_action_collection():
     """开始收集模型提出的写操作，等待用户确认后才真正执行。"""
     return _proposed_actions.set([])
@@ -96,16 +110,21 @@ def _request(
         headers["Authorization"] = token
 
     url = config.java_api_base_url.rstrip("/") + path
-    response = httpx.request(
-        method,
-        url,
-        headers=headers,
-        json=json_body,
-        params=params,
-        timeout=20,
-    )
-    response.raise_for_status()
-    return response.text
+    metrics.increment(f"agent.java_tool.{method.lower()}.calls")
+    try:
+        response = httpx.request(
+            method,
+            url,
+            headers=headers,
+            json=json_body,
+            params=params,
+            timeout=20,
+        )
+        response.raise_for_status()
+        return response.text
+    except Exception:
+        metrics.increment(f"agent.java_tool.{method.lower()}.failures")
+        raise
 
 
 def _enrich_order_status(raw: str) -> str:
@@ -201,6 +220,26 @@ def get_product_recommendations(category_id: int | None = None,
 def get_categories() -> str:
     """查询启用中的商品分类。"""
     return _request("GET", "/api/categories")
+
+
+@tool
+def get_api_catalog(keyword: str = "") -> str:
+    """查询当前角色可用的后端接口能力；只用于选择现有工具，不用于直接拼 URL。"""
+    entries = search_api_catalog(_user_role.get(), keyword, limit=8)
+    return json.dumps(
+        {
+            "role": _user_role.get(),
+            "endpoints": entries,
+            "note": "数据库连接信息不在此目录中，实际访问必须通过白名单业务工具。",
+        },
+        ensure_ascii=False,
+    )
+
+
+@tool
+def web_search(query: str, max_results: int = 5) -> str:
+    """搜索公开互联网信息。仅用于外部实时信息，不用于订单、购物车或内部账户数据。"""
+    return perform_web_search(query, max_results)
 
 
 @tool
@@ -588,6 +627,8 @@ def build_tools(role: str | None = None):
         get_product_detail,
         get_product_recommendations,
         get_categories,
+        get_api_catalog,
+        web_search,
         get_product_reviews,
         get_product_rating_summary,
         get_my_profile,

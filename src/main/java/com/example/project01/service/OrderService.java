@@ -18,6 +18,9 @@ public interface OrderService extends IService<Order> {
     Page<Order> getOrderPage(Long buyerId, int current, int size, Integer status,
                              Boolean reviewed);
 
+    Page<OrderVO> getOrderPageDetails(Long buyerId, int current, int size, Integer status,
+                                      Boolean reviewed);
+
     OrderVO getOrderDetail(Long buyerId, Long orderId);
 
     List<Order> createOrder(Long buyerId, OrderCreateRequest request);
@@ -29,6 +32,8 @@ public interface OrderService extends IService<Order> {
     int closeExpiredOrders(int expireMinutes);
 
     Page<Order> getSellerOrderPage(Long sellerId, int current, int size, Integer status);
+
+    Page<OrderVO> getSellerOrderPageDetails(Long sellerId, int current, int size, Integer status);
 
     OrderVO getSellerOrderDetail(Long sellerId, Long orderId);
 

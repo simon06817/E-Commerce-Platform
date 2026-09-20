@@ -144,12 +144,14 @@ CREATE TABLE `order_outbox` (
     `order_id`    bigint       NOT NULL COMMENT 'order_info.id',
     `event_type`  varchar(50)  NOT NULL,
     `payload`     varchar(2000) DEFAULT NULL,
+    `trace_id`    varchar(64)  DEFAULT NULL,
     `status`      tinyint      DEFAULT 0 COMMENT '0 pending, 1 sent',
     `retry_count` int          DEFAULT 0,
     `create_time` datetime     DEFAULT CURRENT_TIMESTAMP,
     `update_time` datetime     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_status_create_time` (`status`, `create_time`)
+    KEY `idx_status_create_time` (`status`, `create_time`),
+    KEY `idx_outbox_trace_id` (`trace_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE `order_event_record` (
@@ -157,9 +159,11 @@ CREATE TABLE `order_event_record` (
     `order_id`    bigint       NOT NULL COMMENT 'order_info.id',
     `event_type`  varchar(50)  NOT NULL,
     `payload`     varchar(2000) DEFAULT NULL,
+    `trace_id`    varchar(64)  DEFAULT NULL,
     `create_time` datetime     DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_order_event` (`order_id`, `event_type`)
+    UNIQUE KEY `uk_order_event` (`order_id`, `event_type`),
+    KEY `idx_event_record_trace_id` (`trace_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE `product_review` (

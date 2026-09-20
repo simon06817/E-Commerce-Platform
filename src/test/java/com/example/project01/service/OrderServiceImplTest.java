@@ -8,6 +8,7 @@ import com.example.project01.entity.Product;
 import com.example.project01.entity.UserBuyer;
 import com.example.project01.mapper.OrderMapper;
 import com.example.project01.mapper.ProductReviewMapper;
+import com.example.project01.observability.BusinessMetrics;
 import com.example.project01.service.Impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,9 @@ class OrderServiceImplTest {
 
     @Mock
     private UserSellerService userSellerService;
+
+    @Mock
+    private BusinessMetrics businessMetrics;
 
     @InjectMocks
     private OrderServiceImpl orderService;

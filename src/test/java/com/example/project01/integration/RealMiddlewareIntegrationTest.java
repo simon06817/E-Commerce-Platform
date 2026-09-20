@@ -5,13 +5,19 @@ import com.example.project01.common.OutboxStatusEnum;
 import com.example.project01.entity.OrderEventRecord;
 import com.example.project01.entity.OrderNotification;
 import com.example.project01.entity.OutboxMessage;
+import com.example.project01.entity.Product;
 import com.example.project01.mapper.ProductMapper;
 import com.example.project01.service.OrderEventRecordService;
 import com.example.project01.service.OrderNotificationService;
+import com.example.project01.service.OrderService;
 import com.example.project01.service.OutboxMessageService;
+import com.example.project01.service.ProductService;
+import com.example.project01.task.OrderCreatedEventListener;
 import com.example.project01.task.OrderOutboxPublisher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -33,6 +39,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -107,10 +119,22 @@ class RealMiddlewareIntegrationTest {
     private OrderOutboxPublisher outboxPublisher;
 
     @Autowired
+    private OrderCreatedEventListener orderCreatedEventListener;
+
+    @Autowired
     private OrderEventRecordService orderEventRecordService;
 
     @Autowired
     private OrderNotificationService notificationService;
+
+    @Autowired
+    private ProductService productService;
+
+    @Autowired
+    private OrderService orderService;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @Test
     void realRedisCacheAndMysqlCheckoutFlowAreUsed() throws Exception {
@@ -152,10 +176,13 @@ class RealMiddlewareIntegrationTest {
     void realRabbitMqPublishesOutboxAndCreatesNotifications() throws Exception {
         String token = login("BUYER", "buyer01", "123456");
         addToCart(token, 1, 1);
-        long orderId = createOrder(token);
+        String createTraceId = "create-" + UUID.randomUUID();
+        String paidTraceId = "paid-" + UUID.randomUUID();
+        long orderId = createOrder(token, createTraceId);
 
         mockMvc.perform(put("/api/orders/" + orderId + "/pay")
-                        .header("Authorization", "Bearer " + token))
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Trace-Id", paidTraceId))
                 .andExpect(status().isOk());
 
         outboxPublisher.publishPending();
@@ -170,11 +197,23 @@ class RealMiddlewareIntegrationTest {
         assertEquals(2, outboxMessages.size());
         assertTrue(outboxMessages.stream()
                 .allMatch(message -> message.getStatus() == OutboxStatusEnum.SENT.getCode()));
+        assertEquals(createTraceId, outboxMessages.stream()
+                .filter(message -> "ORDER_CREATED".equals(message.getEventType()))
+                .findFirst().orElseThrow().getTraceId());
+        assertEquals(paidTraceId, outboxMessages.stream()
+                .filter(message -> "ORDER_PAID".equals(message.getEventType()))
+                .findFirst().orElseThrow().getTraceId());
 
         List<OrderEventRecord> eventRecords = orderEventRecordService.lambdaQuery()
                 .eq(OrderEventRecord::getOrderId, orderId)
                 .list();
         assertEquals(2, eventRecords.size());
+        assertEquals(createTraceId, eventRecords.stream()
+                .filter(record -> "ORDER_CREATED".equals(record.getEventType()))
+                .findFirst().orElseThrow().getTraceId());
+        assertEquals(paidTraceId, eventRecords.stream()
+                .filter(record -> "ORDER_PAID".equals(record.getEventType()))
+                .findFirst().orElseThrow().getTraceId());
 
         List<OrderNotification> notifications = notificationService.lambdaQuery()
                 .eq(OrderNotification::getOrderId, orderId)
@@ -182,6 +221,102 @@ class RealMiddlewareIntegrationTest {
         assertEquals(3, notifications.size());
         assertFalse(notifications.stream()
                 .anyMatch(notification -> notification.getContent().isBlank()));
+
+        OutboxMessage duplicate = outboxMessages.stream()
+                .filter(message -> "ORDER_PAID".equals(message.getEventType()))
+                .findFirst()
+                .orElseThrow();
+        orderCreatedEventListener.onOrderCreated(duplicate);
+        orderCreatedEventListener.onOrderCreated(duplicate);
+
+        assertEquals(2, orderEventRecordService.lambdaQuery()
+                .eq(OrderEventRecord::getOrderId, orderId)
+                .count());
+        assertEquals(3, notificationService.lambdaQuery()
+                .eq(OrderNotification::getOrderId, orderId)
+                .count());
+        Counter duplicateCounter = meterRegistry.find("ecommerce.events.consumed")
+                .tag("event_type", "ORDER_PAID")
+                .tag("outcome", "duplicate")
+                .counter();
+        assertNotNull(duplicateCounter);
+        assertTrue(duplicateCounter.count() >= 1);
+    }
+
+    @Test
+    void concurrentStockDecreaseAllowsOnlyOneSuccess() throws Exception {
+        Product original = productMapper.selectById(1L);
+        int originalStock = original.getStock();
+        Product update = new Product();
+        update.setId(1L);
+        update.setStock(1);
+        productMapper.updateById(update);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Callable<Boolean> decrease = () -> {
+                ready.countDown();
+                start.await(5, TimeUnit.SECONDS);
+                try {
+                    productService.decreaseStock(1L, 1);
+                    return true;
+                } catch (Exception ignored) {
+                    return false;
+                }
+            };
+            Future<Boolean> first = executor.submit(decrease);
+            Future<Boolean> second = executor.submit(decrease);
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            int success = (first.get(10, TimeUnit.SECONDS) ? 1 : 0)
+                    + (second.get(10, TimeUnit.SECONDS) ? 1 : 0);
+            assertEquals(1, success);
+            assertEquals(0, productMapper.selectById(1L).getStock());
+        } finally {
+            executor.shutdownNow();
+            update.setStock(originalStock);
+            productMapper.updateById(update);
+        }
+    }
+
+    @Test
+    void concurrentShipOrderAllowsOnlyOneTransition() throws Exception {
+        String buyerToken = login("BUYER", "buyer01", "123456");
+        addToCart(buyerToken, 1, 1);
+        long orderId = createOrder(buyerToken);
+        mockMvc.perform(put("/api/orders/" + orderId + "/pay")
+                        .header("Authorization", "Bearer " + buyerToken))
+                .andExpect(status().isOk());
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Callable<Boolean> ship = () -> {
+                ready.countDown();
+                start.await(5, TimeUnit.SECONDS);
+                try {
+                    orderService.shipOrder(1L, orderId);
+                    return true;
+                } catch (Exception ignored) {
+                    return false;
+                }
+            };
+            Future<Boolean> first = executor.submit(ship);
+            Future<Boolean> second = executor.submit(ship);
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            int success = (first.get(10, TimeUnit.SECONDS) ? 1 : 0)
+                    + (second.get(10, TimeUnit.SECONDS) ? 1 : 0);
+            assertEquals(1, success);
+            assertEquals(2, orderService.getById(orderId).getStatus());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private String login(String role, String username, String password) throws Exception {
@@ -205,12 +340,20 @@ class RealMiddlewareIntegrationTest {
     }
 
     private long createOrder(String token) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/orders")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"idempotencyKey\":\"" + UUID.randomUUID()
-                                + "\",\"receiverName\":\"Tom\",\"receiverPhone\":\"13800000000\","
-                                + "\"receiverAddress\":\"Beijing\"}"))
+        return createOrder(token, null);
+    }
+
+    private long createOrder(String token, String traceId) throws Exception {
+        var request = post("/api/orders")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idempotencyKey\":\"" + UUID.randomUUID()
+                        + "\",\"receiverName\":\"Tom\",\"receiverPhone\":\"13800000000\","
+                        + "\"receiverAddress\":\"Beijing\"}");
+        if (traceId != null) {
+            request.header("X-Trace-Id", traceId);
+        }
+        MvcResult result = mockMvc.perform(request)
                 .andExpect(status().isOk())
                 .andReturn();
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());

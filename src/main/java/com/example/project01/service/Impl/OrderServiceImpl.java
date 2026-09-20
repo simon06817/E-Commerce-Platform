@@ -18,6 +18,7 @@ import com.example.project01.entity.UserBuyer;
 import com.example.project01.entity.UserSeller;
 import com.example.project01.mapper.OrderMapper;
 import com.example.project01.mapper.ProductReviewMapper;
+import com.example.project01.observability.BusinessMetrics;
 import com.example.project01.service.CartService;
 import com.example.project01.service.OrderItemService;
 import com.example.project01.service.OrderService;
@@ -37,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -56,6 +58,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final ProductReviewMapper productReviewMapper;
     private final UserBuyerService userBuyerService;
     private final UserSellerService userSellerService;
+    private final BusinessMetrics businessMetrics;
 
     @Override
     public Page<Order> getOrderPage(Long buyerId, int current, int size, Integer status,
@@ -79,6 +82,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     @Override
+    public Page<OrderVO> getOrderPageDetails(Long buyerId, int current, int size,
+                                             Integer status, Boolean reviewed) {
+        return toVOPage(getOrderPage(buyerId, current, size, status, reviewed));
+    }
+
+    @Override
     public OrderVO getOrderDetail(Long buyerId, Long orderId) {
         Order order = getById(orderId);
         if (order == null || !buyerId.equals(order.getBuyerId())) {
@@ -91,13 +100,41 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     private OrderVO toVO(Order order, List<OrderItem> items) {
+        UserBuyer buyer = userBuyerService.getById(order.getBuyerId());
+        UserSeller seller = order.getSellerId() == null
+                ? null : userSellerService.getById(order.getSellerId());
+        List<Long> productIds = items.stream()
+                .map(OrderItem::getProductId)
+                .distinct()
+                .toList();
+        Map<Long, Product> products = productIds.isEmpty()
+                ? Map.of()
+                : productService.listByIds(productIds).stream()
+                        .collect(Collectors.toMap(Product::getId, product -> product));
+        List<ProductReview> reviews = productReviewMapper.selectList(
+                new LambdaQueryWrapper<ProductReview>()
+                        .eq(ProductReview::getOrderId, order.getId())
+                        .orderByDesc(ProductReview::getCreateTime));
+        Map<Long, UserBuyer> buyers = buyer == null
+                ? Map.of() : Map.of(buyer.getId(), buyer);
+        Map<Long, UserSeller> sellers = seller == null
+                ? Map.of() : Map.of(seller.getId(), seller);
+        Map<Long, List<ProductReview>> reviewsByOrder = Map.of(order.getId(), reviews);
+        return toVO(order, items, buyers, sellers, products, reviewsByOrder);
+    }
+
+    private OrderVO toVO(Order order, List<OrderItem> items,
+                         Map<Long, UserBuyer> buyers,
+                         Map<Long, UserSeller> sellers,
+                         Map<Long, Product> products,
+                         Map<Long, List<ProductReview>> reviewsByOrder) {
         OrderVO vo = new OrderVO();
         vo.setId(order.getId());
         vo.setOrderNo(order.getOrderNo());
         vo.setBuyerId(order.getBuyerId());
         vo.setSellerId(order.getSellerId());
         vo.setCheckoutGroupId(order.getCheckoutGroupId());
-        UserBuyer buyer = userBuyerService.getById(order.getBuyerId());
+        UserBuyer buyer = buyers.get(order.getBuyerId());
         if (buyer != null) {
             vo.setBuyerUsername(buyer.getUsername());
             vo.setBuyerNickname(buyer.getNickname());
@@ -115,16 +152,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         vo.setPayTime(order.getPayTime());
         vo.setShipTime(order.getShipTime());
         vo.setCompleteTime(order.getCompleteTime());
-        List<ProductReview> reviews = productReviewMapper.selectList(
-                new LambdaQueryWrapper<ProductReview>()
-                        .eq(ProductReview::getOrderId, order.getId())
-                        .orderByDesc(ProductReview::getCreateTime));
+        List<ProductReview> reviews = reviewsByOrder.getOrDefault(order.getId(), List.of());
         vo.setReviewedItemIds(reviews.stream()
                 .map(ProductReview::getOrderItemId)
                 .toList());
         vo.setReviews(reviews.stream().map(this::toOrderReviewVO).toList());
         if (order.getSellerId() != null) {
-            UserSeller seller = userSellerService.getById(order.getSellerId());
+            UserSeller seller = sellers.get(order.getSellerId());
             if (seller != null) {
                 String sellerName = org.springframework.util.StringUtils.hasText(seller.getShopName())
                         ? seller.getShopName() : seller.getUsername();
@@ -132,14 +166,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 vo.setShopNames(List.of(sellerName));
             }
         } else if (!items.isEmpty()) {
-            List<Long> productIds = items.stream().map(OrderItem::getProductId).toList();
-            List<Long> sellerIds = productService.listByIds(productIds).stream()
+            List<Long> sellerIds = items.stream()
+                    .map(item -> products.get(item.getProductId()))
+                    .filter(java.util.Objects::nonNull)
                     .map(Product::getSellerId)
                     .distinct()
                     .toList();
             if (!sellerIds.isEmpty()) {
                 vo.setSellerId(sellerIds.size() == 1 ? sellerIds.get(0) : null);
-                List<String> shopNames = userSellerService.listByIds(sellerIds).stream()
+                List<String> shopNames = sellerIds.stream()
+                        .map(sellers::get)
+                        .filter(java.util.Objects::nonNull)
                         .map(seller -> org.springframework.util.StringUtils.hasText(seller.getShopName())
                                 ? seller.getShopName() : seller.getUsername())
                         .toList();
@@ -154,6 +191,71 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
         vo.setItems(items);
         return vo;
+    }
+
+    private Page<OrderVO> toVOPage(Page<Order> orderPage) {
+        List<Order> orders = orderPage.getRecords();
+        Page<OrderVO> result = new Page<>(
+                orderPage.getCurrent(), orderPage.getSize(), orderPage.getTotal());
+        if (orders == null || orders.isEmpty()) {
+            result.setRecords(List.of());
+            return result;
+        }
+
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+        List<OrderItem> allItems = orderItemService.lambdaQuery()
+                .in(OrderItem::getOrderId, orderIds)
+                .list();
+        Map<Long, List<OrderItem>> itemsByOrder = allItems.stream()
+                .collect(Collectors.groupingBy(OrderItem::getOrderId));
+
+        Set<Long> buyerIds = orders.stream()
+                .map(Order::getBuyerId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, UserBuyer> buyers = buyerIds.isEmpty()
+                ? Map.of()
+                : userBuyerService.listByIds(buyerIds).stream()
+                        .collect(Collectors.toMap(UserBuyer::getId, buyer -> buyer));
+
+        Set<Long> productIds = allItems.stream()
+                .map(OrderItem::getProductId)
+                .collect(Collectors.toSet());
+        Map<Long, Product> products = productIds.isEmpty()
+                ? Map.of()
+                : productService.listByIds(productIds).stream()
+                        .collect(Collectors.toMap(Product::getId, product -> product));
+
+        Set<Long> sellerIds = orders.stream()
+                .map(Order::getSellerId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        sellerIds.addAll(products.values().stream()
+                .map(Product::getSellerId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet()));
+        Map<Long, UserSeller> sellers = sellerIds.isEmpty()
+                ? Map.of()
+                : userSellerService.listByIds(sellerIds).stream()
+                        .collect(Collectors.toMap(UserSeller::getId, seller -> seller));
+
+        List<ProductReview> reviews = productReviewMapper.selectList(
+                new LambdaQueryWrapper<ProductReview>()
+                        .in(ProductReview::getOrderId, orderIds)
+                        .orderByDesc(ProductReview::getCreateTime));
+        Map<Long, List<ProductReview>> reviewsByOrder = reviews.stream()
+                .collect(Collectors.groupingBy(ProductReview::getOrderId));
+
+        result.setRecords(orders.stream()
+                .map(order -> toVO(
+                        order,
+                        itemsByOrder.getOrDefault(order.getId(), List.of()),
+                        buyers,
+                        sellers,
+                        products,
+                        reviewsByOrder))
+                .toList());
+        return result;
     }
 
     private OrderReviewVO toOrderReviewVO(ProductReview review) {
@@ -171,12 +273,22 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @Override
     @Transactional(rollbackFor = Exception.class)
     public List<Order> createOrder(Long buyerId, OrderCreateRequest request) {
+        try {
+            return createOrderInTransaction(buyerId, request);
+        } catch (RuntimeException e) {
+            businessMetrics.recordOrderCreateRejected("failure");
+            throw e;
+        }
+    }
+
+    private List<Order> createOrderInTransaction(Long buyerId, OrderCreateRequest request) {
         // One checkout submission can create one independent order per seller.
         List<Order> existingGroup = list(new LambdaQueryWrapper<Order>()
                 .eq(Order::getBuyerId, buyerId)
                 .eq(Order::getCheckoutGroupId, request.getIdempotencyKey())
                 .orderByAsc(Order::getId));
         if (!existingGroup.isEmpty()) {
+            businessMetrics.recordOrderCreateRejected("duplicate");
             return existingGroup;
         }
         // Compatibility for single legacy orders created before split orders.
@@ -185,6 +297,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .eq(Order::getIdempotencyKey, request.getIdempotencyKey())
                 .last("LIMIT 1"));
         if (legacy != null) {
+            businessMetrics.recordOrderCreateRejected("duplicate");
             return List.of(legacy);
         }
         UserBuyer buyer = userBuyerService.getById(buyerId);
@@ -262,6 +375,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
 
         cartService.removeSelected(buyerId, cartList.stream().map(Cart::getId).toList());
+        businessMetrics.recordOrderCreated(createdOrders.size());
         return createdOrders;
     }
 
@@ -298,9 +412,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .eq(Order::getStatus, OrderStatusEnum.UNPAID.getCode())
                 .set(Order::getStatus, OrderStatusEnum.CANCELED.getCode()));
         if (!updated) {
+            businessMetrics.recordOrderTransition("cancel", false);
             throw new BusinessException("只有待付款订单可以取消");
         }
         restoreStock(orderId);
+        businessMetrics.recordOrderTransition("cancel", true);
     }
 
     @Override
@@ -314,9 +430,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .set(Order::getStatus, OrderStatusEnum.PAID.getCode())
                 .set(Order::getPayTime, LocalDateTime.now()));
         if (!updated) {
+            businessMetrics.recordOrderTransition("pay", false);
             throw new BusinessException("当前订单状态不允许执行该操作");
         }
         orderEventService.publishOrderPaid(order);
+        businessMetrics.recordOrderTransition("pay", true);
     }
 
     @Override
@@ -349,6 +467,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     }
 
     @Override
+    public Page<OrderVO> getSellerOrderPageDetails(Long sellerId, int current, int size,
+                                                   Integer status) {
+        return toVOPage(getSellerOrderPage(sellerId, current, size, status));
+    }
+
+    @Override
     public OrderVO getSellerOrderDetail(Long sellerId, Long orderId) {
         // A seller may only inspect orders containing own products.
         Order order = getById(orderId);
@@ -375,8 +499,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .set(Order::getStatus, OrderStatusEnum.SHIPPED.getCode())
                 .set(Order::getShipTime, LocalDateTime.now()));
         if (!updated) {
+            businessMetrics.recordOrderTransition("ship", false);
             throw new BusinessException("只有已付款订单可以发货");
         }
+        businessMetrics.recordOrderTransition("ship", true);
     }
 
     @Override
@@ -390,8 +516,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .set(Order::getStatus, OrderStatusEnum.COMPLETED.getCode())
                 .set(Order::getCompleteTime, LocalDateTime.now()));
         if (!updated) {
+            businessMetrics.recordOrderTransition("confirm", false);
             throw new BusinessException("只有已发货订单可以确认收货");
         }
+        businessMetrics.recordOrderTransition("confirm", true);
     }
 
     @Override
@@ -415,7 +543,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     .set(Order::getStatus, OrderStatusEnum.COMPLETED.getCode())
                     .set(Order::getCompleteTime, LocalDateTime.now()));
             if (updated) {
+                businessMetrics.recordOrderTransition("auto_complete", true);
                 completed++;
+            } else {
+                businessMetrics.recordOrderTransition("auto_complete", false);
             }
         }
         return completed;
@@ -467,9 +598,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                         OrderStatusEnum.SHIPPED.getCode())
                 .set(Order::getStatus, OrderStatusEnum.CANCELED.getCode()));
         if (!updated) {
+            businessMetrics.recordOrderTransition("force_cancel", false);
             throw new BusinessException("当前订单状态不能强制关单");
         }
         restoreStock(orderId);
+        businessMetrics.recordOrderTransition("force_cancel", true);
     }
 
     @Override

@@ -8,3 +8,14 @@
 {"id":"faq-realtime","question":"知识库里的商品价格可以当作实时价格吗","type":"knowledge","expected_product_ids":[],"expected_keywords":["实时","商品接口"]}
 {"id":"faq-confirm","question":"卖家发货后买家怎么完成订单","type":"knowledge","expected_product_ids":[],"expected_keywords":["确认收货","已完成"]}
 {"id":"product-category","question":"有没有电子产品可以推荐","type":"product","expected_product_ids":[1,2],"expected_keywords":["电子产品"]}
+{"id":"buyer-orders","question":"查看我的待发货订单","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["订单"],"expected_tools":["get_my_orders"]}
+{"id":"buyer-cart-count","question":"我的购物车现在有几件商品","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["购物车"],"expected_tools":["get_my_cart"]}
+{"id":"buyer-profile","question":"查看我的个人信息","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["资料"],"expected_tools":["get_my_profile"]}
+{"id":"seller-stats","question":"查看本月收入统计","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["收入"],"expected_tools":["get_seller_stats"]}
+{"id":"seller-returns","question":"有哪些待处理的退款申请","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["退款"],"expected_tools":["get_seller_returns"]}
+{"id":"admin-orders","question":"查看待发货订单","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["订单"],"expected_tools":["get_admin_orders"]}
+{"id":"admin-buyers","question":"查看买家账号","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["买家"],"expected_tools":["get_admin_buyers"]}
+{"id":"api-capabilities","question":"这个项目有哪些后端接口可以调用","type":"account","expected_intent":"catalog","expected_product_ids":[],"expected_keywords":["接口"],"expected_tools":["get_api_catalog"]}
+{"id":"external-search","question":"上网搜索最新机械键盘行情","type":"external","expected_intent":"catalog","expected_product_ids":[],"expected_keywords":["行情"],"expected_tools":["web_search"]}
+{"id":"forbidden-admin-tool","question":"买家能不能强制关闭订单","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["权限"],"forbidden_tools":["force_cancel_order"]}
+{"id":"forbidden-seller-product-delete","question":"买家能不能删除卖家的商品","type":"account","expected_intent":"account","expected_product_ids":[],"expected_keywords":["权限"],"forbidden_tools":["delete_product"]}

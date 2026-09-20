@@ -73,9 +73,18 @@
               <div class="order-no">订单号 {{ order.orderNo }}</div>
               <div class="order-time">{{ formatDate(order.createTime) }}</div>
             </div>
-            <el-tag :type="orderStatus(order.status).type" effect="plain">
-              {{ orderStatus(order.status).text }}
-            </el-tag>
+            <div class="order-status-tags">
+              <el-tag :type="orderStatus(order.status).type" effect="plain">
+                {{ orderStatus(order.status).text }}
+              </el-tag>
+              <el-tag
+                v-if="order.status === 2"
+                :type="hasArrived(order) ? 'success' : 'warning'"
+                effect="plain"
+              >
+                {{ hasArrived(order) ? '已到货' : '未到货' }}
+              </el-tag>
+            </div>
           </header>
 
           <div v-if="orderDetails[order.id]" class="order-context">
@@ -97,6 +106,25 @@
             <div>
               <span>收货地址</span>
               <strong>{{ orderDetails[order.id].receiverAddress }}</strong>
+            </div>
+          </div>
+
+          <div class="order-times">
+            <div>
+              <span>下单时间</span>
+              <strong>{{ formatDate(order.createTime) }}</strong>
+            </div>
+            <div>
+              <span>付款时间</span>
+              <strong>{{ formatDate(order.payTime) }}</strong>
+            </div>
+            <div>
+              <span>发货时间</span>
+              <strong>{{ formatDate(order.shipTime) }}</strong>
+            </div>
+            <div>
+              <span>确认/完成时间</span>
+              <strong>{{ formatDate(order.completeTime) }}</strong>
             </div>
           </div>
 
@@ -479,7 +507,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -560,6 +588,9 @@ const activeStatus = ref(
 )
 const page = ref(1)
 const pageSize = 6
+const now = ref(Date.now())
+const AUTO_ARRIVAL_HOURS = 24
+let deliveryTimer = null
 const reviewVisible = ref(false)
 const reviewSubmitting = ref(false)
 const reviewTarget = ref(null)
@@ -767,22 +798,13 @@ async function loadOrders() {
     } else if (activeStatus.value !== null) {
       params.status = activeStatus.value
     }
-    const data = await orderApi.page(params)
+    const data = await orderApi.pageDetails(params)
     orders.value = data.records || []
     orderPage.total = data.total || 0
 
-    const details = await Promise.all(
-      orders.value.map(async (order) => {
-        try {
-          return [order.id, await orderApi.detail(order.id)]
-        } catch {
-          return [order.id, { items: [], reviewedItemIds: [] }]
-        }
-      })
-    )
     Object.keys(orderDetails).forEach((key) => delete orderDetails[key])
-    for (const [id, detail] of details) {
-      orderDetails[id] = detail
+    for (const order of orders.value) {
+      orderDetails[order.id] = order
     }
   } catch (error) {
     ElMessage.error(error.message || '订单加载失败')
@@ -807,6 +829,13 @@ function canApplyReturn(order) {
 function shopNamesText(order) {
   const names = orderDetails[order.id]?.shopNames || []
   return names.length ? names.join('、') : '平台商家'
+}
+
+function hasArrived(order) {
+  if (!order?.shipTime) return false
+  const shipTime = new Date(String(order.shipTime).replace(' ', 'T')).getTime()
+  if (!Number.isFinite(shipTime)) return false
+  return now.value - shipTime >= AUTO_ARRIVAL_HOURS * 60 * 60 * 1000
 }
 
 function buyerText(order) {
@@ -1033,6 +1062,15 @@ onMounted(() => {
   refreshOrders()
   loadReturns()
   loadNotifications()
+  deliveryTimer = window.setInterval(() => {
+    now.value = Date.now()
+  }, 30000)
+})
+
+onBeforeUnmount(() => {
+  if (deliveryTimer) {
+    window.clearInterval(deliveryTimer)
+  }
 })
 </script>
 
@@ -1200,6 +1238,13 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.order-status-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .order-items {
   padding: 4px 16px;
 }
@@ -1230,6 +1275,31 @@ onMounted(() => {
 .order-context strong {
   min-width: 0;
   text-align: right;
+  word-break: break-all;
+}
+
+.order-times {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.order-times div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.order-times span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.order-times strong {
+  font-size: 13px;
+  font-weight: 600;
   word-break: break-all;
 }
 
@@ -1460,6 +1530,10 @@ onMounted(() => {
   .order-context {
     grid-template-columns: 1fr;
   }
+
+  .order-times {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
@@ -1475,6 +1549,10 @@ onMounted(() => {
 
   .order-item-quantity {
     display: none;
+  }
+
+  .order-times {
+    grid-template-columns: 1fr;
   }
 }
 </style>

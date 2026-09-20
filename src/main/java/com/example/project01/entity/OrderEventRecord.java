@@ -26,6 +26,8 @@ public class OrderEventRecord {
 
     private String payload;
 
+    private String traceId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 }

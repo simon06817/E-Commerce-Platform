@@ -1,5 +1,6 @@
 package com.example.project01.cache;
 
+import com.example.project01.observability.BusinessMetrics;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -23,14 +24,17 @@ public class CacheSupport {
 
     private final CacheManager cacheManager;
     private final CacheLockService lockService;
+    private final BusinessMetrics businessMetrics;
 
     public <T> T getOrLoad(String cacheName, String key, Supplier<T> loader) {
         // Fast path: serve directly from cache without taking the lock.
         Cache cache = cacheManager.getCache(cacheName);
         T cached = read(cache, key);
         if (cached != null) {
+            businessMetrics.recordCacheAccess(cacheName, "hit");
             return cached;
         }
+        businessMetrics.recordCacheAccess(cacheName, "miss");
 
         String lockKey = lockKey(cacheName, key);
         String token = lockService.newToken();
@@ -39,6 +43,7 @@ public class CacheSupport {
             try {
                 T doubleCheck = read(cache, key);
                 if (doubleCheck != null) {
+                    businessMetrics.recordCacheAccess(cacheName, "hit_after_lock");
                     return doubleCheck;
                 }
                 T value = loader.get();
@@ -65,11 +70,14 @@ public class CacheSupport {
 
         T cached = read(positive, key);
         if (cached != null) {
+            businessMetrics.recordCacheAccess(positiveCacheName, "hit");
             return cached;
         }
         if (negative != null && negative.get(key) != null) {
+            businessMetrics.recordCacheAccess(positiveCacheName, "negative_hit");
             return null;
         }
+        businessMetrics.recordCacheAccess(positiveCacheName, "miss");
 
         String lockKey = lockKey(positiveCacheName, key);
         String token = lockService.newToken();
@@ -77,9 +85,11 @@ public class CacheSupport {
             try {
                 T doubleCheck = read(positive, key);
                 if (doubleCheck != null) {
+                    businessMetrics.recordCacheAccess(positiveCacheName, "hit_after_lock");
                     return doubleCheck;
                 }
                 if (negative != null && negative.get(key) != null) {
+                    businessMetrics.recordCacheAccess(positiveCacheName, "negative_hit");
                     return null;
                 }
                 T value = loader.get();

@@ -12,6 +12,8 @@
 - Flyway 数据库版本管理
 - Knife4j / OpenAPI 3 API 文档
 - 阿里云 DashScope（通义千问）AI 接口
+- 可选 Tavily 外部联网检索
+- 按角色过滤的后端 API 能力目录
 - JUnit 5 + Mockito + H2 + MockMvc 测试
 - Maven + GitHub Actions CI
 
@@ -41,6 +43,7 @@ flowchart LR
     RABBIT --> CONSUMER["Java order event consumer"]
     CONSUMER --> MYSQL
     AGENT -->|"product/order/review/notification + JWT"| API
+    AGENT -->|"external search"| TAVILY[("Tavily")]
     AGENT --> CHROMA[("Chroma<br/>RAG vector store")]
     AGENT --> OLLAMA[("Ollama<br/>qwen3.5:0.8b")]
 ```
@@ -161,11 +164,22 @@ sequenceDiagram
 
 AI Agent（`ai-agent/`）：FastAPI + LangChain/LangGraph + Ollama，提供进程内短期会话记忆（每个用户一条会话，保留最近 20 条消息），回答前会先检索知识库、商品描述、实时库存价格和真实评价。
 
+Agent 将内部知识、外部搜索和业务操作分层处理：
+
+- Chroma 保存 FAQ、政策和商品描述。
+- Tavily 用于外部实时信息，未配置 API Key 时自动禁用。
+- `data/api_catalog.json` 保存后端接口能力和权限信息。
+- 订单、购物车、退款和管理操作继续通过带 JWT 的 Java 工具执行。
+- MySQL 地址、端口、用户名、密码和 JDBC URL 不进入 Agent 知识库或提示词。
+
 登录后返回 30 分钟 access token 和 7 天 refresh token；refresh token 每次刷新后轮换，退出登录会把 access token 写入 Redis 黑名单并删除 refresh token。
 
 状态码统一由枚举维护并与数据库注释保持一致：`OrderStatusEnum`、`ProductStatusEnum`、`CategoryStatusEnum`、`ReturnStatusEnum`。
 
 API 文档（本地启动后）：`http://localhost:8080/doc.html`
+
+详细架构、订单拆单、Agent 路由和数据库索引设计见
+[`docs/architecture.md`](docs/architecture.md)。
 
 ## 运行环境
 
@@ -208,15 +222,17 @@ export JWT_SECRET=your-long-random-secret
 mvn test
 ```
 
-当前完整测试为 `44` 个，覆盖 JWT 生成解析、三角色登录、注册恢复、购物车下单、
-多卖家拆单、库存扣减、权限拒绝、订单生命周期、评价、退款和管理员接口。
+当前完整测试为 `51` 个，覆盖 JWT 生成解析、三角色登录、注册恢复、购物车下单、
+多卖家拆单、批量订单详情、库存扣减、并发库存竞争、重复发货、权限拒绝、
+订单生命周期、评价、退款和管理员接口。可靠性测试额外覆盖库存不足时整单事务
+回滚、重复支付只产生一次支付事件，以及 RabbitMQ 重复消费不重复创建通知。
 
 `RealMiddlewareIntegrationTest` 使用 Testcontainers 启动真实 MySQL 8.4、Redis 7.4 和
 RabbitMQ 3.13，验证 Redis 缓存、MySQL 下单事务、Outbox 发布、消息消费和通知副作用。
 本机需要运行 Docker；没有 Docker 时该组测试会自动跳过。当前完整测试结果：
 
 ```text
-Tests run: 44
+Tests run: 51
 Failures: 0
 Errors: 0
 Skipped: 0
@@ -235,9 +251,25 @@ Actuator 与 Micrometer 提供以下本地端点：
 每个 HTTP 请求都会生成或复用 `X-Trace-Id` 响应头，并在日志的
 `logging.pattern.correlation` 中输出对应 `traceId`，便于串联请求日志。
 
+除 JVM、HTTP 和数据库指标外，项目还提供以下业务指标：
+
+- 订单创建成功与拒绝数量
+- 支付、取消、发货、收货等状态迁移结果
+- 库存扣减和恢复结果
+- 商品缓存命中、未命中和空值缓存命中
+- Outbox 发布结果、待发送数量和最老消息等待时间
+- MQ 新事件、重复事件和消费失败数量
+
+`traceId` 会写入 Outbox，并继续传递给 RabbitMQ 消费端，因此下单请求、支付请求、
+异步通知和消费日志可以使用同一个链路标识定位。
+
 ## CI
 
-`.github/workflows/maven.yml` 在 push / PR 时自动执行 JDK 17 + `mvn test`。
+`.github/workflows/maven.yml` 在 push / PR 时自动执行：
+
+- Java 17 完整后端测试
+- Python Agent 单元测试
+- Vue 前端生产构建
 
 ## 前端
 
@@ -272,17 +304,43 @@ pnpm run build
 
 ## Docker Compose
 
-`docker-compose.yml` 提供 MySQL、Redis、RabbitMQ、Java 后端和前端的本地一键启动：
+`docker-compose.yml` 提供 MySQL、Redis、RabbitMQ、Ollama、Java 后端、Agent 和前端的本地一键启动：
 
 ```bash
 docker compose up -d --build
 ```
 
 首次启动会自动执行 `sql/schema.sql`、`sql/seed.sql` 和 `sql/demo_bulk_data.sql`。
+Compose 中的 Java 容器关闭 Flyway，避免初始化 SQL 与迁移脚本重复建表。
+Agent 从本机未提交的 `ai-agent/.env` 读取 `TAVILY_API_KEY`，但容器内会使用
+`http://java:8080` 访问后端，并通过 `http://ollama:11434` 访问 Compose 内部的
+Ollama 服务。
+
+启动前需要确认：
+
+1. Docker Desktop 正在运行
+2. 已从 `ai-agent/.env.example` 创建 `ai-agent/.env`
+3. Docker 数据盘预留模型空间，首次启动需要下载 Ollama 模型
+
 启动后访问：
 
 - 前端：`http://localhost:5173`
 - Java API：`http://localhost:8080`
+- Agent：`http://localhost:8000`
+- Agent 健康检查：`http://localhost:8000/health`
 - RabbitMQ 管理页：`http://localhost:15672`
 
-Agent 服务保持独立部署，不包含在该 Compose 文件中。
+`ollama-init` 会自动下载 `OLLAMA_MODEL` 和 `EMBEDDING_MODEL`。模型保存在
+`ollama-data` 卷中，后续启动不会重复下载。宿主机不再需要单独启动 Ollama。
+Docker 默认使用 CPU 推理，首次下载和首次加载模型会明显慢于后续请求；可通过
+`docker compose logs -f ollama-init` 查看模型下载进度。
+
+Nginx 已为 `/agent/chat/stream` 关闭响应缓冲和缓存，确保 Agent 流式输出能够实时
+到达浏览器。若需要清空本地数据库和向量数据重新初始化：
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+`down -v` 也会删除已经下载的 Ollama 模型，再次启动时会重新下载。

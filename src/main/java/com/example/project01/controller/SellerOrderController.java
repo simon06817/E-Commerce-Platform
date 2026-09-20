@@ -42,6 +42,17 @@ public class SellerOrderController {
         return Result.success(orderService.getSellerOrderPage(loginUser.getId(), page, size, status));
     }
 
+    @Operation(summary = "Page seller order details in one request", description = "seller only")
+    @GetMapping("/page-details")
+    @PreAuthorize("hasRole('SELLER')")
+    public Result<Page<OrderVO>> pageDetails(@AuthenticationPrincipal LoginUser loginUser,
+                                             @RequestParam(defaultValue = "1") int page,
+                                             @RequestParam(defaultValue = "10") int size,
+                                             @RequestParam(required = false) Integer status) {
+        return Result.success(orderService.getSellerOrderPageDetails(
+                loginUser.getId(), page, size, status));
+    }
+
     @Operation(summary = "Seller order detail", description = "seller only")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('SELLER')")

@@ -39,6 +39,8 @@ export const cartApi = {
 
 export const orderApi = {
   page: (params) => unwrap(api.get('/api/orders', { params })),
+  pageDetails: (params) =>
+    unwrap(api.get('/api/orders/page-details', { params })),
   detail: (id) => unwrap(api.get(`/api/orders/${id}`)),
   create: (data) => unwrap(api.post('/api/orders', data)),
   pay: (id) => unwrap(api.put(`/api/orders/${id}/pay`)),
@@ -48,6 +50,8 @@ export const orderApi = {
 
 export const sellerOrderApi = {
   page: (params) => unwrap(api.get('/api/seller/orders', { params })),
+  pageDetails: (params) =>
+    unwrap(api.get('/api/seller/orders/page-details', { params })),
   detail: (id) => unwrap(api.get(`/api/seller/orders/${id}`)),
   ship: (id) => unwrap(api.put(`/api/seller/orders/${id}/ship`))
 }

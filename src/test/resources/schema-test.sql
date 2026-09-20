@@ -116,6 +116,7 @@ CREATE TABLE order_outbox (
   order_id bigint not null,
   event_type varchar(50) not null,
   payload varchar(2000),
+  trace_id varchar(64),
   status tinyint default 0,
   retry_count int default 0,
   create_time timestamp default current_timestamp,
@@ -127,6 +128,7 @@ CREATE TABLE order_event_record (
   order_id bigint not null,
   event_type varchar(50) not null,
   payload varchar(2000),
+  trace_id varchar(64),
   create_time timestamp default current_timestamp,
   unique (order_id, event_type)
 );

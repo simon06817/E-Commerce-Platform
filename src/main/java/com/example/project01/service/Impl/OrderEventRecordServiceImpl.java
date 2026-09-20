@@ -15,21 +15,25 @@ public class OrderEventRecordServiceImpl extends ServiceImpl<OrderEventRecordMap
         implements OrderEventRecordService {
 
     @Override
-    public void recordIfAbsent(Long orderId, String eventType, String payload) {
+    public boolean recordIfAbsent(Long orderId, String eventType, String payload,
+                                  String traceId) {
         if (lambdaQuery()
                 .eq(OrderEventRecord::getOrderId, orderId)
                 .eq(OrderEventRecord::getEventType, eventType)
                 .count() > 0) {
-            return;
+            return false;
         }
         OrderEventRecord record = new OrderEventRecord();
         record.setOrderId(orderId);
         record.setEventType(eventType);
         record.setPayload(payload);
+        record.setTraceId(traceId);
         try {
             save(record);
+            return true;
         } catch (DuplicateKeyException ignored) {
             // concurrent duplicate consumer
+            return false;
         }
     }
 }

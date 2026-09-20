@@ -50,6 +50,18 @@ public class OrderController {
                 loginUser.getId(), page, size, status, reviewed));
     }
 
+    @Operation(summary = "Page my order details in one request", description = "buyer only")
+    @GetMapping("/page-details")
+    @PreAuthorize("hasRole('BUYER')")
+    public Result<Page<OrderVO>> pageDetails(@AuthenticationPrincipal LoginUser loginUser,
+                                             @RequestParam(defaultValue = "1") int page,
+                                             @RequestParam(defaultValue = "10") int size,
+                                             @RequestParam(required = false) Integer status,
+                                             @RequestParam(required = false) Boolean reviewed) {
+        return Result.success(orderService.getOrderPageDetails(
+                loginUser.getId(), page, size, status, reviewed));
+    }
+
     @Operation(summary = "Order detail", description = "buyer only")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('BUYER')")

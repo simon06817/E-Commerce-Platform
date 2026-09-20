@@ -4,6 +4,8 @@ import com.example.project01.entity.OutboxMessage;
 import com.example.project01.entity.Order;
 import com.example.project01.entity.OrderItem;
 import com.example.project01.entity.Product;
+import com.example.project01.observability.BusinessMetrics;
+import com.example.project01.observability.TraceContext;
 import com.example.project01.service.OrderEventRecordService;
 import com.example.project01.service.OrderItemService;
 import com.example.project01.service.OrderNotificationService;
@@ -14,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.MDC;
 
 import java.util.List;
 
@@ -35,18 +39,36 @@ public class OrderCreatedEventListener {
     private final OrderService orderService;
     private final OrderItemService orderItemService;
     private final ProductService productService;
+    private final BusinessMetrics businessMetrics;
 
     @RabbitListener(queues = "${app.rabbitmq.order-queue}")
+    @Transactional(rollbackFor = Exception.class)
     public void onOrderCreated(OutboxMessage message) {
-        orderEventRecordService.recordIfAbsent(
-                message.getOrderId(), message.getEventType(), message.getPayload());
-        if (EVENT_ORDER_CREATED.equals(message.getEventType())) {
-            notifyBuyerOrderCreated(message.getOrderId());
-        } else if (EVENT_ORDER_PAID.equals(message.getEventType())) {
-            notifyOrderPaid(message.getOrderId());
+        String traceId = TraceContext.normalizeOrCreate(message.getTraceId());
+        message.setTraceId(traceId);
+        try (MDC.MDCCloseable ignored = TraceContext.withTraceId(traceId)) {
+            boolean firstDelivery = orderEventRecordService.recordIfAbsent(
+                    message.getOrderId(), message.getEventType(), message.getPayload(), traceId);
+            if (!firstDelivery) {
+                businessMetrics.recordEventConsumed(message.getEventType(), "duplicate");
+                log.info("duplicate order event ignored, orderId={}, event={}, traceId={}",
+                        message.getOrderId(), message.getEventType(), traceId);
+                return;
+            }
+            try {
+                if (EVENT_ORDER_CREATED.equals(message.getEventType())) {
+                    notifyBuyerOrderCreated(message.getOrderId());
+                } else if (EVENT_ORDER_PAID.equals(message.getEventType())) {
+                    notifyOrderPaid(message.getOrderId());
+                }
+                businessMetrics.recordEventConsumed(message.getEventType(), "new");
+            } catch (RuntimeException e) {
+                businessMetrics.recordEventConsumed(message.getEventType(), "failure");
+                throw e;
+            }
+            log.info("order event consumed and recorded, orderId={}, event={}, traceId={}",
+                    message.getOrderId(), message.getEventType(), traceId);
         }
-        log.info("order event consumed and recorded, orderId={}, event={}",
-                message.getOrderId(), message.getEventType());
     }
 
     private void notifyBuyerOrderCreated(Long orderId) {

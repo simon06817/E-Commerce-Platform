@@ -26,6 +26,8 @@ public class OutboxMessage {
 
     private String payload;
 
+    private String traceId;
+
     private Integer status;
 
     private Integer retryCount;

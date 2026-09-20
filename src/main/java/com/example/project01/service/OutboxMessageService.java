@@ -10,7 +10,7 @@ import java.util.List;
  */
 public interface OutboxMessageService extends IService<OutboxMessage> {
 
-    void savePending(Long orderId, String eventType, String payload);
+    void savePending(Long orderId, String eventType, String payload, String traceId);
 
     List<OutboxMessage> listPending(int limit);
 

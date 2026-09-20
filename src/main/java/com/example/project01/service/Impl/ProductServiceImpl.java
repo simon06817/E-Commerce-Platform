@@ -14,6 +14,7 @@ import com.example.project01.dto.ProductRequest;
 import com.example.project01.entity.Product;
 import com.example.project01.entity.UserSeller;
 import com.example.project01.mapper.ProductMapper;
+import com.example.project01.observability.BusinessMetrics;
 import com.example.project01.service.ProductService;
 import com.example.project01.service.UserSellerService;
 import com.example.project01.vo.ProductRecommendationVO;
@@ -51,6 +52,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     private final ProductBloomFilter bloomFilter;
     private final CacheSupport cacheSupport;
     private final UserSellerService userSellerService;
+    private final BusinessMetrics businessMetrics;
 
     @Override
     public Page<Product> getProductPage(int current, int size, Long categoryId, String keyword,
@@ -314,6 +316,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         // Early check gives a clear business error; the conditional UPDATE below
         // is still the concurrency-safe guard.
         if (product.getStock() < quantity) {
+            businessMetrics.recordStockChange("decrease", false);
             throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
         }
         boolean success = update(new LambdaUpdateWrapper<Product>()
@@ -321,11 +324,13 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 .ge(Product::getStock, quantity)
                 .setSql("stock = stock - {0}", quantity));
         if (!success) {
+            businessMetrics.recordStockChange("decrease", false);
             if (getById(product.getId()) == null) {
                 throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
             }
             throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
         }
+        businessMetrics.recordStockChange("decrease", true);
         int newStock = product.getStock() - quantity;
         refreshProductCacheAfterCommit(product.getId(), product, newStock);
     }
@@ -336,14 +341,17 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         // Used when an unpaid order is cancelled or times out.
         Product product = getById(productId);
         if (product == null) {
+            businessMetrics.recordStockChange("increase", false);
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
         boolean success = update(new LambdaUpdateWrapper<Product>()
                 .eq(Product::getId, productId)
                 .setSql("stock = stock + {0}", quantity));
         if (!success) {
+            businessMetrics.recordStockChange("increase", false);
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
+        businessMetrics.recordStockChange("increase", true);
         refreshProductCacheAfterCommit(productId, product, product.getStock() + quantity);
     }
 

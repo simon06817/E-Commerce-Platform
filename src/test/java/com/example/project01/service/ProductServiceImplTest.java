@@ -4,6 +4,7 @@ import com.example.project01.cache.CacheSupport;
 import com.example.project01.cache.ProductBloomFilter;
 import com.example.project01.entity.Product;
 import com.example.project01.mapper.ProductMapper;
+import com.example.project01.observability.BusinessMetrics;
 import com.example.project01.service.Impl.ProductServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,9 @@ class ProductServiceImplTest {
 
     @Mock
     private UserSellerService userSellerService;
+
+    @Mock
+    private BusinessMetrics businessMetrics;
 
     @InjectMocks
     private ProductServiceImpl productService;

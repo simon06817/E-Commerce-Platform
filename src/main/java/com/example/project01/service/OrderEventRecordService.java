@@ -8,5 +8,6 @@ import com.example.project01.entity.OrderEventRecord;
  */
 public interface OrderEventRecordService extends IService<OrderEventRecord> {
 
-    void recordIfAbsent(Long orderId, String eventType, String payload);
+    boolean recordIfAbsent(Long orderId, String eventType, String payload,
+                           String traceId);
 }
