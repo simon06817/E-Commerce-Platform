@@ -125,11 +125,14 @@ sequenceDiagram
 
 - 下单时从购物车生成订单，写 `order_info` + `order_item` 商品快照，扣减库存，清空购物车，整体事务包裹
 - 下单幂等键 + 唯一索引，订单超时自动关单并恢复库存
+- 订单发货后 24 小时自动确认到货；发货后至完成前可申请退款，卖家同意后恢复库存并完成模拟退款
 - 订单事件（ORDER_CREATED/ORDER_PAID）走 outbox + RabbitMQ，消费侧唯一索引幂等
 - 扣库存使用 SQL 级条件更新 `UPDATE product SET stock = stock - ? WHERE id = ? AND stock >= ?`，避免并发超卖
 - 用户表、角色表启用 MyBatis-Plus 逻辑删除（`deleted` 字段）
 
-> 订单模型按“整单状态流转”实现，演示场景以单卖家下单为主；多卖家拆单/明细级发货是后续演进方向。
+新订单会按卖家自动拆分为多张独立订单。一次结算生成同一个 `checkout_group_id`，
+每张卖家订单拥有独立的订单号、金额、状态、支付、发货、退款和确认收货流程。
+历史数据不迁移，旧订单仍按原订单结构查询。
 
 ## 主要接口
 
@@ -205,11 +208,20 @@ export JWT_SECRET=your-long-random-secret
 mvn test
 ```
 
-覆盖范围：JWT 生成解析、三角色登录、购物车下单全流程、库存扣减、权限拒绝、管理员接口。
+当前完整测试为 `44` 个，覆盖 JWT 生成解析、三角色登录、注册恢复、购物车下单、
+多卖家拆单、库存扣减、权限拒绝、订单生命周期、评价、退款和管理员接口。
 
 `RealMiddlewareIntegrationTest` 使用 Testcontainers 启动真实 MySQL 8.4、Redis 7.4 和
 RabbitMQ 3.13，验证 Redis 缓存、MySQL 下单事务、Outbox 发布、消息消费和通知副作用。
-本机需要运行 Docker；没有 Docker 时该组测试会自动跳过。
+本机需要运行 Docker；没有 Docker 时该组测试会自动跳过。当前完整测试结果：
+
+```text
+Tests run: 44
+Failures: 0
+Errors: 0
+Skipped: 0
+BUILD SUCCESS
+```
 
 ## 可观测性
 
@@ -226,3 +238,51 @@ Actuator 与 Micrometer 提供以下本地端点：
 ## CI
 
 `.github/workflows/maven.yml` 在 push / PR 时自动执行 JDK 17 + `mvn test`。
+
+## 前端
+
+前端位于 `frontend/`，使用 Vue 3、Vite、Element Plus、Pinia 和 Vue Router。
+
+本地开发：
+
+```bash
+cd frontend
+pnpm install
+pnpm run dev
+```
+
+默认地址为 `http://localhost:5173`，Vite 会把 `/api`、`/uploads` 转发到 Java 服务，
+把 `/agent` 转发到 Python Agent。
+
+管理端已覆盖：
+
+- 平台数据概览
+- 全部订单查询、详情和强制关单
+- 买家账号查询和删除
+- 卖家账号、店铺资料查询和删除
+- 分类新增、编辑、启停和删除
+- 管理员资料与密码修改
+
+生产构建：
+
+```bash
+cd frontend
+pnpm run build
+```
+
+## Docker Compose
+
+`docker-compose.yml` 提供 MySQL、Redis、RabbitMQ、Java 后端和前端的本地一键启动：
+
+```bash
+docker compose up -d --build
+```
+
+首次启动会自动执行 `sql/schema.sql`、`sql/seed.sql` 和 `sql/demo_bulk_data.sql`。
+启动后访问：
+
+- 前端：`http://localhost:5173`
+- Java API：`http://localhost:8080`
+- RabbitMQ 管理页：`http://localhost:15672`
+
+Agent 服务保持独立部署，不包含在该 Compose 文件中。

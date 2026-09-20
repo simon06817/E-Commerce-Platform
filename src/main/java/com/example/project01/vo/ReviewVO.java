@@ -14,6 +14,8 @@ public class ReviewVO {
 
     private Long productId;
 
+    private String productName;
+
     private Integer rating;
 
     private String content;

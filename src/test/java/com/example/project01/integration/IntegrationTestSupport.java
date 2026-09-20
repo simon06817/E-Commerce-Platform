@@ -63,7 +63,9 @@ abstract class IntegrationTestSupport {
     }
 
     protected long createOrder(String token) throws Exception {
-        return data(createOrderResult(token, UUID.randomUUID().toString())).path("id").asLong();
+        JsonNode result = data(createOrderResult(token, UUID.randomUUID().toString()));
+        JsonNode order = result.isArray() ? result.get(0) : result;
+        return order.path("id").asLong();
     }
 
     protected int productStock(int productId) throws Exception {

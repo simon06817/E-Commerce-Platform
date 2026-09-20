@@ -7,8 +7,8 @@ import lombok.Getter;
  */
 @Getter
 public enum OutboxStatusEnum {
-    PENDING(0, "pending"),
-    SENT(1, "sent");
+    PENDING(0, "待发送"),
+    SENT(1, "已发送");
 
     private final int code;
     private final String desc;

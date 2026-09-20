@@ -16,6 +16,7 @@ import com.example.project01.entity.UserSeller;
 import com.example.project01.mapper.ProductMapper;
 import com.example.project01.service.ProductService;
 import com.example.project01.service.UserSellerService;
+import com.example.project01.vo.ProductRecommendationVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -27,10 +28,13 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -42,12 +46,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> implements ProductService {
 
+    private static final Pattern TRAILING_DIGITS = Pattern.compile("^(.*?)(\\d+)$");
+
     private final ProductBloomFilter bloomFilter;
     private final CacheSupport cacheSupport;
     private final UserSellerService userSellerService;
 
     @Override
-    public Page<Product> getProductPage(int current, int size, Long categoryId, String keyword, Integer status) {
+    public Page<Product> getProductPage(int current, int size, Long categoryId, String keyword,
+                                        String shopName, Integer status) {
         Page<Product> page = new Page<>(current, size);
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
         if (categoryId != null) {
@@ -56,9 +63,17 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         if (status != null) {
             wrapper.eq(Product::getStatus, status);
         }
+        if (StringUtils.hasText(shopName)) {
+            Long sellerId = resolveSellerId(shopName.trim());
+            if (sellerId == null) {
+                return page;
+            }
+            wrapper.eq(Product::getSellerId, sellerId);
+        }
         if (StringUtils.hasText(keyword)) {
             String normalizedKeyword = keyword.trim();
-            Long sellerId = resolveSellerId(normalizedKeyword);
+            Long sellerId = StringUtils.hasText(shopName)
+                    ? null : resolveSellerId(normalizedKeyword);
             if (sellerId != null) {
                 wrapper.eq(Product::getSellerId, sellerId);
             } else {
@@ -88,12 +103,42 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     }
 
     @Override
+    public Page<Product> getSellerProductPage(Long sellerId, int current, int size,
+                                              Long categoryId, String keyword, Integer status) {
+        Page<Product> page = new Page<>(current, size);
+        LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Product::getSellerId, sellerId);
+        if (categoryId != null) {
+            wrapper.eq(Product::getCategoryId, categoryId);
+        }
+        if (status != null) {
+            wrapper.eq(Product::getStatus, status);
+        }
+        if (StringUtils.hasText(keyword)) {
+            String normalizedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(Product::getName, normalizedKeyword)
+                    .or()
+                    .like(Product::getDescription, normalizedKeyword));
+        }
+        wrapper.orderByDesc(Product::getUpdateTime);
+        Page<Product> result = page(page, wrapper);
+        enrichSellerNames(result.getRecords());
+        return result;
+    }
+
+    @Override
     public Product getProductDetail(Long id) {
         Product product = getProductById(id);
         if (product != null) {
             enrichSellerNames(List.of(product));
         }
         return product;
+    }
+
+    @Override
+    public List<ProductRecommendationVO> getRecommendations(Long categoryId, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 20));
+        return baseMapper.selectRecommendations(categoryId, safeLimit);
     }
 
     private Long resolveSellerId(String keyword) {
@@ -115,7 +160,40 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 .select(UserSeller::getId)
                 .apply("LOWER(shop_name) LIKE CONCAT(LOWER({0}), '%')", keyword)
                 .list();
-        return prefixMatches.size() == 1 ? prefixMatches.get(0).getId() : null;
+        if (prefixMatches.size() == 1) {
+            return prefixMatches.get(0).getId();
+        }
+        if (prefixMatches.size() > 1) {
+            return null;
+        }
+
+        // Users commonly type Shop 07 as shop7. Keep the indexed exact/prefix
+        // checks above as the fast path, then fall back to a normalized match
+        // that ignores spaces, separators and leading zeros in numeric suffixes.
+        String normalizedKeyword = normalizeShopName(keyword);
+        List<Long> normalizedMatches = userSellerService.lambdaQuery()
+                .select(UserSeller::getId, UserSeller::getShopName)
+                .list()
+                .stream()
+                .filter(seller -> normalizedKeyword.equals(
+                        normalizeShopName(seller.getShopName())))
+                .map(UserSeller::getId)
+                .toList();
+        return normalizedMatches.size() == 1 ? normalizedMatches.get(0) : null;
+    }
+
+    private String normalizeShopName(String shopName) {
+        if (!StringUtils.hasText(shopName)) {
+            return "";
+        }
+        String compact = shopName.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[\\s\\-_]+", "");
+        Matcher matcher = TRAILING_DIGITS.matcher(compact);
+        if (!matcher.matches()) {
+            return compact;
+        }
+        String number = matcher.group(2).replaceFirst("^0+(?!$)", "");
+        return matcher.group(1) + number;
     }
 
     private void enrichSellerNames(List<Product> products) {

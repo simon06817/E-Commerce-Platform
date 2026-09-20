@@ -41,11 +41,14 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     }
 
     @Override
-    public Page<ProductCategory> getCategoryPage(int current, int size, String name) {
+    public Page<ProductCategory> getCategoryPage(int current, int size, String name, Integer status) {
         Page<ProductCategory> page = new Page<>(current, size);
         LambdaQueryWrapper<ProductCategory> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(name)) {
             wrapper.like(ProductCategory::getName, name);
+        }
+        if (status != null) {
+            wrapper.eq(ProductCategory::getStatus, status);
         }
         wrapper.orderByAsc(ProductCategory::getSortOrder);
         return page(page, wrapper);
@@ -56,7 +59,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
     @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
     public void addCategory(ProductCategory category) {
         if (lambdaQuery().eq(ProductCategory::getName, category.getName()).count() > 0) {
-            throw new BusinessException("category name already exists");
+            throw new BusinessException("分类名称已存在");
         }
         save(category);
     }

@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * Return/refund request for one completed order item.
+ * Return/refund request for one shipped or completed order item.
  */
 @Data
 @TableName("order_return")

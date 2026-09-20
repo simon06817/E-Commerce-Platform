@@ -7,10 +7,10 @@ import lombok.Getter;
  */
 @Getter
 public enum ReturnStatusEnum {
-    APPLIED(0, "applied"),
-    APPROVED(1, "approved and refunded"),
-    REJECTED(2, "rejected"),
-    CANCELED(3, "canceled");
+    APPLIED(0, "待卖家处理"),
+    APPROVED(1, "已同意并退款"),
+    REJECTED(2, "已拒绝"),
+    CANCELED(3, "已撤销");
 
     private final int code;
     private final String desc;

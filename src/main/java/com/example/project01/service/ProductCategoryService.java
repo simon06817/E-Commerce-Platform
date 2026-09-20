@@ -13,7 +13,7 @@ public interface ProductCategoryService extends IService<ProductCategory> {
 
     List<ProductCategory> listEnabledCategories();
 
-    Page<ProductCategory> getCategoryPage(int current, int size, String name);
+    Page<ProductCategory> getCategoryPage(int current, int size, String name, Integer status);
 
     void addCategory(ProductCategory category);
 

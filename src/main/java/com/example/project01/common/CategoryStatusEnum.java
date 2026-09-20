@@ -7,8 +7,8 @@ import lombok.Getter;
  */
 @Getter
 public enum CategoryStatusEnum {
-    DISABLED(0, "disabled"),
-    ENABLED(1, "enabled");
+    DISABLED(0, "已禁用"),
+    ENABLED(1, "已启用");
 
     private final int code;
     private final String desc;

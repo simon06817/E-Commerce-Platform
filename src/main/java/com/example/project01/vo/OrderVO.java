@@ -20,6 +20,24 @@ public class OrderVO {
 
     private Long buyerId;
 
+    private Long sellerId;
+
+    private String sellerName;
+
+    private String checkoutGroupId;
+
+    private String buyerUsername;
+
+    private String buyerNickname;
+
+    private String buyerPhone;
+
+    private String buyerEmail;
+
+    private String buyerAddress;
+
+    private List<String> shopNames;
+
     private BigDecimal totalAmount;
 
     private Integer status;
@@ -36,7 +54,13 @@ public class OrderVO {
 
     private LocalDateTime payTime;
 
+    private LocalDateTime shipTime;
+
     private LocalDateTime completeTime;
+
+    private List<Long> reviewedItemIds;
+
+    private List<OrderReviewVO> reviews;
 
     private List<OrderItem> items;
 }

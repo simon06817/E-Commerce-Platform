@@ -1,18 +1,24 @@
 package com.example.project01.integration;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.example.project01.service.UserBuyerService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AuthIntegrationTest extends IntegrationTestSupport {
+
+    @Autowired
+    private UserBuyerService userBuyerService;
 
     @Test
     void wrongPasswordFails() throws Exception {
@@ -94,5 +100,27 @@ class AuthIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk());
 
         assertFalse(login("BUYER", "profilebuyer", "654321").isBlank());
+    }
+
+    @Test
+    void deletedBuyerCanRegisterWithSameUsernameAgain() throws Exception {
+        MvcResult firstRegistration = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"BUYER\",\"username\":\"restorebuyer\","
+                                + "\"password\":\"123456\",\"nickname\":\"old buyer\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        long buyerId = data(firstRegistration).path("userId").asLong();
+        assertTrue(userBuyerService.removeById(buyerId));
+
+        MvcResult restored = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"BUYER\",\"username\":\"restorebuyer\","
+                                + "\"password\":\"654321\",\"nickname\":\"restored buyer\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertEquals(buyerId, data(restored).path("userId").asLong());
+        assertFalse(login("BUYER", "restorebuyer", "654321").isBlank());
     }
 }

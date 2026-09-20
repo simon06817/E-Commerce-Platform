@@ -49,15 +49,16 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
         if (order == null || !buyerId.equals(order.getBuyerId())) {
             throw new BusinessException(ResultCode.NOT_FOUND);
         }
-        if (order.getStatus() != OrderStatusEnum.COMPLETED.getCode()) {
-            throw new BusinessException("only completed orders can be returned");
-        }
-        if (order.getCompleteTime() == null
-                || order.getCompleteTime().isBefore(LocalDateTime.now().minusDays(RETURN_WINDOW_DAYS))) {
-            throw new BusinessException("return window has expired");
+        boolean shipped = order.getStatus() == OrderStatusEnum.SHIPPED.getCode();
+        boolean completedWithinWindow = order.getStatus() == OrderStatusEnum.COMPLETED.getCode()
+                && order.getCompleteTime() != null
+                && !order.getCompleteTime().isBefore(
+                        LocalDateTime.now().minusDays(RETURN_WINDOW_DAYS));
+        if (!shipped && !completedWithinWindow) {
+            throw new BusinessException("发货后或确认收货后七天内可以申请退款");
         }
         if (lambdaQuery().eq(OrderReturn::getOrderItemId, item.getId()).count() > 0) {
-            throw new BusinessException("return request already exists");
+            throw new BusinessException("该订单商品已经提交过退款申请");
         }
         Product product = productService.getById(item.getProductId());
         if (product == null) {
@@ -93,7 +94,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
     public void cancelReturn(Long buyerId, Long returnId) {
         OrderReturn orderReturn = getOwnedReturn(buyerId, null, returnId, true);
         if (orderReturn.getStatus() != ReturnStatusEnum.APPLIED.getCode()) {
-            throw new BusinessException("only applied returns can be canceled");
+            throw new BusinessException("只有待处理的退款申请可以撤销");
         }
         orderReturn.setStatus(ReturnStatusEnum.CANCELED.getCode());
         orderReturn.setHandleTime(LocalDateTime.now());
@@ -114,7 +115,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
     public void approveReturn(Long sellerId, Long returnId, String note) {
         OrderReturn orderReturn = getOwnedReturn(null, sellerId, returnId, false);
         if (orderReturn.getStatus() != ReturnStatusEnum.APPLIED.getCode()) {
-            throw new BusinessException("only applied returns can be approved");
+            throw new BusinessException("只有待处理的退款申请可以同意");
         }
         orderReturn.setStatus(ReturnStatusEnum.APPROVED.getCode());
         orderReturn.setHandleNote(note);
@@ -129,7 +130,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
     public void rejectReturn(Long sellerId, Long returnId, String note) {
         OrderReturn orderReturn = getOwnedReturn(null, sellerId, returnId, false);
         if (orderReturn.getStatus() != ReturnStatusEnum.APPLIED.getCode()) {
-            throw new BusinessException("only applied returns can be rejected");
+            throw new BusinessException("只有待处理的退款申请可以拒绝");
         }
         orderReturn.setStatus(ReturnStatusEnum.REJECTED.getCode());
         orderReturn.setHandleNote(note);

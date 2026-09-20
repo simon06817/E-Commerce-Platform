@@ -9,9 +9,11 @@ import com.example.project01.common.ResultCode;
 import com.example.project01.dto.ReviewCreateRequest;
 import com.example.project01.entity.Order;
 import com.example.project01.entity.OrderItem;
+import com.example.project01.entity.OrderReturn;
 import com.example.project01.entity.ProductReview;
 import com.example.project01.entity.UserBuyer;
 import com.example.project01.mapper.ProductReviewMapper;
+import com.example.project01.mapper.OrderReturnMapper;
 import com.example.project01.service.OrderItemService;
 import com.example.project01.service.OrderService;
 import com.example.project01.service.ProductService;
@@ -22,6 +24,7 @@ import com.example.project01.vo.ReviewVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -39,6 +42,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
     private final OrderService orderService;
     private final UserBuyerService userBuyerService;
     private final ProductService productService;
+    private final OrderReturnMapper orderReturnMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -54,6 +58,17 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         // Reviews are only allowed after the buyer confirmed receipt.
         if (order.getStatus() != OrderStatusEnum.COMPLETED.getCode()) {
             throw new BusinessException(ResultCode.REVIEW_NOT_ALLOWED);
+        }
+        if (!StringUtils.hasText(request.getContent())) {
+            throw new BusinessException("评价内容不能为空");
+        }
+        long refundedCount = orderReturnMapper.selectCount(
+                new QueryWrapper<OrderReturn>()
+                        .eq("order_item_id", item.getId())
+                        .eq("status", com.example.project01.common.ReturnStatusEnum
+                                .APPROVED.getCode()));
+        if (refundedCount > 0) {
+            throw new BusinessException(ResultCode.REFUNDED_PRODUCT_CANNOT_REVIEW);
         }
         if (lambdaQuery().eq(ProductReview::getOrderItemId, item.getId()).count() > 0) {
             throw new BusinessException(ResultCode.REVIEW_ALREADY_EXISTS);
@@ -149,6 +164,8 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         ReviewVO vo = new ReviewVO();
         vo.setId(review.getId());
         vo.setProductId(review.getProductId());
+        com.example.project01.entity.Product product = productService.getById(review.getProductId());
+        vo.setProductName(product == null ? null : product.getName());
         vo.setRating(review.getRating());
         vo.setContent(review.getContent());
         vo.setReplyContent(review.getReplyContent());

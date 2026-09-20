@@ -7,8 +7,10 @@ import com.example.project01.common.ResultCode;
 import com.example.project01.dto.PasswordChangeRequest;
 import com.example.project01.dto.ProfileUpdateRequest;
 import com.example.project01.entity.UserBuyer;
+import com.example.project01.entity.UserAdmin;
 import com.example.project01.entity.UserSeller;
 import com.example.project01.service.ProfileService;
+import com.example.project01.service.UserAdminService;
 import com.example.project01.service.UserBuyerService;
 import com.example.project01.service.UserSellerService;
 import com.example.project01.vo.ProfileVO;
@@ -26,6 +28,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     private final UserBuyerService userBuyerService;
     private final UserSellerService userSellerService;
+    private final UserAdminService userAdminService;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -35,6 +38,9 @@ public class ProfileServiceImpl implements ProfileService {
         }
         if (loginUser.getRole() == AuthRole.SELLER) {
             return toSellerVO(userSellerService.getById(loginUser.getId()));
+        }
+        if (loginUser.getRole() == AuthRole.ADMIN) {
+            return toAdminVO(userAdminService.getById(loginUser.getId()));
         }
         throw new BusinessException(ResultCode.INVALID_ROLE);
     }
@@ -65,6 +71,16 @@ public class ProfileServiceImpl implements ProfileService {
             userSellerService.updateById(seller);
             return toSellerVO(seller);
         }
+        if (loginUser.getRole() == AuthRole.ADMIN) {
+            UserAdmin admin = userAdminService.getById(loginUser.getId());
+            if (admin == null) {
+                throw new BusinessException(ResultCode.USER_NOT_EXIST);
+            }
+            admin.setPhone(request.getPhone());
+            admin.setEmail(request.getEmail());
+            userAdminService.updateById(admin);
+            return toAdminVO(admin);
+        }
         throw new BusinessException(ResultCode.INVALID_ROLE);
     }
 
@@ -84,6 +100,13 @@ public class ProfileServiceImpl implements ProfileService {
             verifyAndSetPassword(seller == null ? null : seller.getPassword(), request.getOldPassword(), encoded);
             seller.setPassword(encoded);
             userSellerService.updateById(seller);
+            return;
+        }
+        if (loginUser.getRole() == AuthRole.ADMIN) {
+            UserAdmin admin = userAdminService.getById(loginUser.getId());
+            verifyAndSetPassword(admin == null ? null : admin.getPassword(), request.getOldPassword(), encoded);
+            admin.setPassword(encoded);
+            userAdminService.updateById(admin);
             return;
         }
         throw new BusinessException(ResultCode.INVALID_ROLE);
@@ -121,6 +144,19 @@ public class ProfileServiceImpl implements ProfileService {
         vo.setShopName(seller.getShopName());
         vo.setPhone(seller.getPhone());
         vo.setEmail(seller.getEmail());
+        return vo;
+    }
+
+    private ProfileVO toAdminVO(UserAdmin admin) {
+        if (admin == null) {
+            throw new BusinessException(ResultCode.USER_NOT_EXIST);
+        }
+        ProfileVO vo = new ProfileVO();
+        vo.setId(admin.getId());
+        vo.setUsername(admin.getUsername());
+        vo.setRole(AuthRole.ADMIN);
+        vo.setPhone(admin.getPhone());
+        vo.setEmail(admin.getEmail());
         return vo;
     }
 }

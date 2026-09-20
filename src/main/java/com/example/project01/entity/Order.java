@@ -34,6 +34,19 @@ public class Order {
     @NotNull(message = "buyer id must not be null")
     private Long buyerId;
 
+    /**
+     * Seller owning this split order. Null on legacy orders created before
+     * seller-based order splitting was introduced.
+     */
+    @TableField("seller_id")
+    private Long sellerId;
+
+    /**
+     * Groups split seller orders created from one checkout submission.
+     */
+    @TableField("checkout_group_id")
+    private String checkoutGroupId;
+
     @NotNull(message = "total amount must not be null")
     @TableField("total_amount")
     private BigDecimal totalAmount;
@@ -61,6 +74,9 @@ public class Order {
 
     @TableField("payment_time")
     private LocalDateTime payTime;
+
+    @TableField("ship_time")
+    private LocalDateTime shipTime;
 
     @TableField("complete_time")
     private LocalDateTime completeTime;

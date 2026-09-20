@@ -11,7 +11,8 @@ export const BUYER_ORDER_TABS = [
   { label: '待付款', value: 0 },
   { label: '待发货', value: 1 },
   { label: '待收货', value: 2 },
-  { label: '已完成', value: 3 }
+  { label: '已完成', value: 3 },
+  { label: '已评价', value: 'reviewed' }
 ]
 
 export const RETURN_STATUS = {

@@ -5,6 +5,7 @@ import {
   getRefreshToken,
   saveSession
 } from './session'
+import { localizeMessage } from '../utils/message'
 
 const api = axios.create({
   baseURL: '',
@@ -24,6 +25,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const responseMessage =
+      error.response?.data?.message || error.response?.data?.detail
+    if (responseMessage) {
+      error.response.data.message = localizeMessage(responseMessage)
+      error.response.data.detail = localizeMessage(responseMessage)
+    }
+    if (error.message) {
+      error.message = localizeMessage(error.message)
+    }
+
     const original = error.config
     const status = error.response?.status
     const refreshToken = getRefreshToken()
@@ -40,7 +51,7 @@ api.interceptors.response.use(
         .then((response) => {
           const body = response.data
           if (body.code !== 200) {
-            throw new Error(body.message || '登录已过期')
+            throw new Error(localizeMessage(body.message) || '登录已过期')
           }
           saveSession(body.data)
           return body.data.token
@@ -68,7 +79,7 @@ export async function unwrap(request) {
   const response = await request
   const body = response.data
   if (!body || body.code !== 200) {
-    throw new Error(body?.message || '请求失败')
+    throw new Error(localizeMessage(body?.message) || '请求失败')
   }
   return body.data
 }

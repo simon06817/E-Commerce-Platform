@@ -1,0 +1,8 @@
+target
+.git
+.idea
+.vscode
+frontend
+ai-agent
+uploads
+*.log

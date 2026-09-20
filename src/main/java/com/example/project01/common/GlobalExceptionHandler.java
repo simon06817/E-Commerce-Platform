@@ -20,7 +20,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({BindException.class, MethodArgumentNotValidException.class})
     public Result<Void> handleValidationException(Exception e) {
-        String msg = "invalid parameter";
+        String msg = "请求参数错误";
         if (e instanceof BindException be && be.getBindingResult().getAllErrors().size() > 0) {
             msg = be.getBindingResult().getAllErrors().get(0).getDefaultMessage();
         } else if (e instanceof MethodArgumentNotValidException me

@@ -27,12 +27,12 @@ public class FileStorageServiceImpl implements FileStorageService {
     @Override
     public String storeImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new BusinessException("file must not be empty");
+            throw new BusinessException("上传文件不能为空");
         }
         String original = file.getOriginalFilename();
         String extension = StringUtils.getFilenameExtension(original);
         if (extension == null || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase())) {
-            throw new BusinessException("only jpg/jpeg/png/gif/webp images are allowed");
+            throw new BusinessException("仅支持 JPG、JPEG、PNG、GIF、WEBP 图片");
         }
         File dir = new File(uploadProperties.getDir());
         if (!dir.exists() && !dir.mkdirs()) {

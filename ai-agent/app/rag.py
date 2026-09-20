@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
 
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
@@ -21,6 +22,7 @@ def _embeddings():
     )
 
 
+@lru_cache(maxsize=4)
 def _vector_store(collection_name: str) -> Chroma:
     """按集合名打开本地 Chroma 向量库。"""
     return Chroma(
@@ -67,6 +69,7 @@ def rebuild_product_store(products: list[dict[str, Any]]) -> int:
     except Exception:
         # 首次运行时集合可能还不存在。
         pass
+    _vector_store.cache_clear()
     store = _vector_store(config.product_collection)
 
     splitter = RecursiveCharacterTextSplitter(
@@ -113,6 +116,14 @@ def rebuild_product_store(products: list[dict[str, Any]]) -> int:
 
 def search_structured(query: str, k: int = 3) -> dict[str, list[dict[str, Any]]]:
     """返回结构化的静态知识与商品检索结果，供确定性前置检索使用。"""
+    return {
+        "knowledge": search_knowledge(query, k),
+        "products": search_products(query, k),
+    }
+
+
+def search_knowledge(query: str, k: int = 3) -> list[dict[str, Any]]:
+    """只检索 FAQ、政策和指南知识库。"""
     knowledge = []
     for doc in _vector_store(config.kb_collection).similarity_search(query, k=k):
         metadata = doc.metadata or {}
@@ -123,7 +134,11 @@ def search_structured(query: str, k: int = 3) -> dict[str, list[dict[str, Any]]]
                 "source_type": metadata.get("source_type", "knowledge"),
             }
         )
+    return knowledge
 
+
+def search_products(query: str, k: int = 3) -> list[dict[str, Any]]:
+    """只检索商品描述向量集合。"""
     products = []
     for doc in _vector_store(config.product_collection).similarity_search(query, k=k):
         metadata = doc.metadata or {}
@@ -137,7 +152,7 @@ def search_structured(query: str, k: int = 3) -> dict[str, list[dict[str, Any]]]
                 "source_type": "product",
             }
         )
-    return {"knowledge": knowledge, "products": products}
+    return products
 
 
 def search(query: str, k: int = 3) -> str:

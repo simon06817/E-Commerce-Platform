@@ -1,9 +1,17 @@
 package com.example.project01.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.project01.common.BusinessException;
 import com.example.project01.common.Result;
+import com.example.project01.entity.Cart;
+import com.example.project01.entity.Order;
+import com.example.project01.entity.Product;
 import com.example.project01.entity.UserBuyer;
 import com.example.project01.entity.UserSeller;
+import com.example.project01.service.CartService;
+import com.example.project01.service.OrderService;
+import com.example.project01.service.ProductService;
 import com.example.project01.service.UserBuyerService;
 import com.example.project01.service.UserSellerService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +37,9 @@ public class AdminUserController {
 
     private final UserBuyerService buyerService;
     private final UserSellerService sellerService;
+    private final OrderService orderService;
+    private final CartService cartService;
+    private final ProductService productService;
 
     @Operation(summary = "List buyers")
     @GetMapping("/buyers")
@@ -49,6 +60,16 @@ public class AdminUserController {
     @Operation(summary = "Delete buyer")
     @DeleteMapping("/buyers/{id}")
     public Result<Void> deleteBuyer(@PathVariable Long id) {
+        long orderCount = orderService.count(
+                new LambdaQueryWrapper<Order>().eq(Order::getBuyerId, id));
+        if (orderCount > 0) {
+            throw new BusinessException("该买家存在历史订单，不能直接删除");
+        }
+        long cartCount = cartService.count(
+                new LambdaQueryWrapper<Cart>().eq(Cart::getBuyerId, id));
+        if (cartCount > 0) {
+            throw new BusinessException("该买家购物车尚未清空，不能直接删除");
+        }
         buyerService.removeById(id);
         return Result.success();
     }
@@ -56,6 +77,11 @@ public class AdminUserController {
     @Operation(summary = "Delete seller")
     @DeleteMapping("/sellers/{id}")
     public Result<Void> deleteSeller(@PathVariable Long id) {
+        long productCount = productService.count(
+                new LambdaQueryWrapper<Product>().eq(Product::getSellerId, id));
+        if (productCount > 0) {
+            throw new BusinessException("该卖家仍有商品，不能直接删除");
+        }
         sellerService.removeById(id);
         return Result.success();
     }

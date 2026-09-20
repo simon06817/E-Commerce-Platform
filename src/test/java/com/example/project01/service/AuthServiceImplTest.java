@@ -4,6 +4,8 @@ import com.example.project01.common.AuthRole;
 import com.example.project01.dto.LoginRequest;
 import com.example.project01.dto.RegisterRequest;
 import com.example.project01.entity.UserBuyer;
+import com.example.project01.mapper.UserBuyerMapper;
+import com.example.project01.mapper.UserSellerMapper;
 import com.example.project01.security.JwtUtil;
 import com.example.project01.security.TokenStore;
 import com.example.project01.service.Impl.AuthServiceImpl;
@@ -32,6 +34,12 @@ class AuthServiceImplTest {
 
     @Mock
     private UserSellerService userSellerService;
+
+    @Mock
+    private UserBuyerMapper userBuyerMapper;
+
+    @Mock
+    private UserSellerMapper userSellerMapper;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -92,7 +100,11 @@ class AuthServiceImplTest {
         request.setRole(AuthRole.BUYER);
         request.setUsername("buyer01");
         request.setPassword("123456");
-        when(userBuyerService.existsByUsername(anyString())).thenReturn(true);
+        UserBuyer existing = new UserBuyer();
+        existing.setId(1L);
+        existing.setUsername("buyer01");
+        existing.setDeleted(0);
+        when(userBuyerMapper.selectAnyByUsername(anyString())).thenReturn(existing);
 
         assertThrows(RuntimeException.class, () -> authService.register(request));
     }

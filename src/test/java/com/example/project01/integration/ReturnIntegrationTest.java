@@ -26,9 +26,6 @@ class ReturnIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(put("/api/seller/orders/" + orderId + "/ship")
                         .header("Authorization", "Bearer " + sellerToken))
                 .andExpect(status().isOk());
-        mockMvc.perform(put("/api/orders/" + orderId + "/confirm")
-                        .header("Authorization", "Bearer " + buyerToken))
-                .andExpect(status().isOk());
 
         JsonNode items = orderDetail(buyerToken, orderId).path("items");
         long orderItemId = itemIdForProduct(items, 2);

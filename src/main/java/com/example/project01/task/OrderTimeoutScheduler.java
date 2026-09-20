@@ -20,6 +20,9 @@ public class OrderTimeoutScheduler {
     @Value("${app.order.expire-minutes:30}")
     private int expireMinutes;
 
+    @Value("${app.order.auto-complete-hours:24}")
+    private int autoCompleteHours;
+
     @Scheduled(
             initialDelayString = "${app.order.close-initial-delay-ms:60000}",
             fixedDelayString = "${app.order.close-scan-interval-ms:60000}")
@@ -27,6 +30,16 @@ public class OrderTimeoutScheduler {
         int closed = orderService.closeExpiredOrders(expireMinutes);
         if (closed > 0) {
             log.info("closed {} expired unpaid orders", closed);
+        }
+    }
+
+    @Scheduled(
+            initialDelayString = "${app.order.auto-complete-initial-delay-ms:60000}",
+            fixedDelayString = "${app.order.auto-complete-scan-interval-ms:60000}")
+    public void autoCompleteShippedOrders() {
+        int completed = orderService.autoCompleteShippedOrders(autoCompleteHours);
+        if (completed > 0) {
+            log.info("automatically completed {} delivered orders", completed);
         }
     }
 }

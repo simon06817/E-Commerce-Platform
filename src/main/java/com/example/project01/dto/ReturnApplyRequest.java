@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 /**
- * Buyer return request for one completed order item.
+ * Buyer refund/return request for one shipped or completed order item.
  */
 @Data
 public class ReturnApplyRequest {

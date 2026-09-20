@@ -48,7 +48,7 @@
         </div>
         <div class="orders-heading-actions">
           <el-button text :icon="RotateCcw" @click="openReturns">
-            退货记录
+            退款记录
           </el-button>
           <el-button text :icon="RefreshCw" @click="refreshOrders">
             刷新
@@ -78,6 +78,28 @@
             </el-tag>
           </header>
 
+          <div v-if="orderDetails[order.id]" class="order-context">
+            <div>
+              <span>商家</span>
+              <strong>{{ shopNamesText(order) }}</strong>
+            </div>
+            <div>
+              <span>下单账号</span>
+              <strong>{{ buyerText(order) }}</strong>
+            </div>
+            <div>
+              <span>收货人</span>
+              <strong>
+                {{ orderDetails[order.id].receiverName }}
+                {{ orderDetails[order.id].receiverPhone }}
+              </strong>
+            </div>
+            <div>
+              <span>收货地址</span>
+              <strong>{{ orderDetails[order.id].receiverAddress }}</strong>
+            </div>
+          </div>
+
           <div class="order-items">
             <div
               v-for="item in orderDetails[order.id]?.items || []"
@@ -95,9 +117,12 @@
               <div class="order-item-name">{{ item.productName }}</div>
               <div class="order-item-quantity">×{{ item.quantity }}</div>
               <div class="price">{{ formatPrice(item.subtotal) }}</div>
-              <div v-if="order.status === 3" class="order-item-actions">
+              <div
+                v-if="order.status === 2 || order.status === 3"
+                class="order-item-actions"
+              >
                 <el-button
-                  v-if="!reviewedItemIds.has(item.id)"
+                  v-if="!isRefundedItem(item) && !isItemReviewed(order, item)"
                   text
                   type="primary"
                   size="small"
@@ -105,7 +130,13 @@
                 >
                   评价
                 </el-button>
-                <el-tag v-else type="success" size="small">已评价</el-tag>
+                <el-tag
+                  v-else-if="!isRefundedItem(item)"
+                  type="success"
+                  size="small"
+                >
+                  已评价
+                </el-tag>
 
                 <el-tag
                   v-if="returnByOrderItem[item.id]"
@@ -115,14 +146,36 @@
                   {{ returnStatus(returnByOrderItem[item.id].status).text }}
                 </el-tag>
                 <el-button
-                  v-else-if="withinReturnWindow(order)"
+                  v-else-if="canApplyReturn(order)"
                   text
                   type="warning"
                   size="small"
                   @click="openReturn(order, item)"
                 >
-                  申请退货
+                  申请退款
                 </el-button>
+              </div>
+              <div
+                v-if="reviewForItem(order, item)"
+                class="order-item-review"
+              >
+                <div class="review-heading">
+                  <span>我的评价</span>
+                  <el-rate
+                    :model-value="reviewForItem(order, item).rating"
+                    disabled
+                    show-score
+                  />
+                </div>
+                <p>
+                  {{ reviewForItem(order, item).content || '用户未填写评价内容' }}
+                </p>
+                <p
+                  v-if="reviewForItem(order, item).replyContent"
+                  class="seller-reply"
+                >
+                  商家回复：{{ reviewForItem(order, item).replyContent }}
+                </p>
               </div>
             </div>
           </div>
@@ -313,21 +366,21 @@
 
     <el-dialog
       v-model="returnVisible"
-      title="申请退货退款"
+      title="申请退款"
       width="min(520px, 92vw)"
     >
       <div class="dialog-product-name">
         {{ returnTarget?.productName || '商品' }}
       </div>
       <el-form label-position="top">
-        <el-form-item label="退货原因">
+        <el-form-item label="退款原因">
           <el-input
             v-model.trim="returnForm.reason"
             type="textarea"
             :rows="4"
             maxlength="500"
             show-word-limit
-            placeholder="请说明退货原因"
+            placeholder="请说明退款原因"
           />
         </el-form-item>
       </el-form>
@@ -345,7 +398,7 @@
 
     <el-drawer
       v-model="returnsVisible"
-      title="退货记录"
+      title="退款记录"
       size="min(520px, 92vw)"
     >
       <div v-if="loadingReturns" class="drawer-list">
@@ -353,8 +406,8 @@
       </div>
       <EmptyState
         v-else-if="!returnRecords.length"
-        title="暂无退货记录"
-        description="已完成订单可以在七天内申请退货"
+        title="暂无退款记录"
+        description="发货后或确认收货后七天内可以申请退款"
       />
       <div v-else class="drawer-list">
         <article
@@ -373,7 +426,7 @@
           </header>
           <div class="record-row">数量：{{ item.quantity }}</div>
           <div class="record-row">退款金额：<span class="price">{{ formatPrice(item.refundAmount) }}</span></div>
-          <div class="record-row">退货原因：{{ item.reason }}</div>
+          <div class="record-row">退款原因：{{ item.reason }}</div>
           <div v-if="item.handleNote" class="record-row">
             卖家说明：{{ item.handleNote }}
           </div>
@@ -415,8 +468,8 @@
         >
           <span class="notification-dot" />
           <span class="notification-content">
-            <strong>{{ item.title }}</strong>
-            <span>{{ item.content }}</span>
+            <strong>{{ localizeMessage(item.title) }}</strong>
+            <span>{{ localizeMessage(item.content) }}</span>
             <time>{{ formatDate(item.createTime) }}</time>
           </span>
         </button>
@@ -435,6 +488,7 @@ import {
   CircleCheck,
   CreditCard,
   LogOut,
+  MessageSquareText,
   PackageOpen,
   Pencil,
   RefreshCw,
@@ -461,6 +515,7 @@ import {
   orderStatus,
   returnStatus
 } from '../utils/format'
+import { localizeMessage } from '../utils/message'
 
 const route = useRoute()
 const router = useRouter()
@@ -494,9 +549,14 @@ const loadingOrders = ref(false)
 const orders = ref([])
 const orderPage = reactive({ total: 0 })
 const orderDetails = reactive({})
-const counts = reactive({ 0: 0, 1: 0, 2: 0, 3: 0 })
+const counts = reactive({ 0: 0, 1: 0, 2: 0, 3: 0, reviewed: 0 })
+const statusQuery = route.query.status
 const activeStatus = ref(
-  route.query.status === undefined ? null : Number(route.query.status)
+  statusQuery === undefined
+    ? null
+    : statusQuery === 'reviewed'
+      ? 'reviewed'
+      : Number(statusQuery)
 )
 const page = ref(1)
 const pageSize = 6
@@ -532,7 +592,9 @@ const statusCards = computed(() =>
           ? PackageOpen
           : item.value === 2
             ? Truck
-            : CircleCheck
+            : item.value === 3
+              ? CircleCheck
+              : MessageSquareText
   }))
 )
 
@@ -659,17 +721,38 @@ async function changePassword() {
 async function loadCounts() {
   try {
     const statuses = [0, 1, 2, 3]
-    const pages = await Promise.all(
-      statuses.map((status) =>
-        orderApi.page({ page: 1, size: 1, status })
-      )
-    )
+    const [pages, reviewedPage] = await Promise.all([
+      Promise.all(
+        statuses.map((status) =>
+          orderApi.page({ page: 1, size: 1, status })
+        )
+      ),
+      orderApi.page({ page: 1, size: 1, reviewed: true })
+    ])
     statuses.forEach((status, index) => {
       counts[status] = pages[index].total || 0
     })
+    counts.reviewed = reviewedPage.total || 0
   } catch {
     // Counts are non-critical.
   }
+}
+
+function isRefundedItem(item) {
+  return returnByOrderItem[item.id]?.status === 1
+}
+
+function isItemReviewed(order, item) {
+  if (reviewedItemIds.value.has(item.id)) {
+    return true
+  }
+  const recordedIds = orderDetails[order.id]?.reviewedItemIds || []
+  return recordedIds.includes(item.id)
+}
+
+function reviewForItem(order, item) {
+  const reviews = orderDetails[order.id]?.reviews || []
+  return reviews.find((review) => review.orderItemId === item.id) || null
 }
 
 async function loadOrders() {
@@ -679,7 +762,9 @@ async function loadOrders() {
       page: page.value,
       size: pageSize
     }
-    if (activeStatus.value !== null) {
+    if (activeStatus.value === 'reviewed') {
+      params.reviewed = true
+    } else if (activeStatus.value !== null) {
       params.status = activeStatus.value
     }
     const data = await orderApi.page(params)
@@ -691,7 +776,7 @@ async function loadOrders() {
         try {
           return [order.id, await orderApi.detail(order.id)]
         } catch {
-          return [order.id, { items: [] }]
+          return [order.id, { items: [], reviewedItemIds: [] }]
         }
       })
     )
@@ -712,6 +797,24 @@ function withinReturnWindow(order) {
   if (!Number.isFinite(completedAt)) return false
   const elapsed = Date.now() - completedAt
   return elapsed >= 0 && elapsed <= 7 * 24 * 60 * 60 * 1000
+}
+
+function canApplyReturn(order) {
+  if (order?.status === 2) return true
+  return order?.status === 3 && withinReturnWindow(order)
+}
+
+function shopNamesText(order) {
+  const names = orderDetails[order.id]?.shopNames || []
+  return names.length ? names.join('、') : '平台商家'
+}
+
+function buyerText(order) {
+  const detail = orderDetails[order.id]
+  if (!detail) return '-'
+  return detail.buyerNickname
+    ? `${detail.buyerUsername}（${detail.buyerNickname}）`
+    : detail.buyerUsername || '-'
 }
 
 async function loadReturns() {
@@ -738,6 +841,10 @@ function openReturns() {
 }
 
 function openReview(order, item) {
+  if (isRefundedItem(item)) {
+    ElMessage.warning('已退款商品不能评价')
+    return
+  }
   reviewTarget.value = {
     ...item,
     orderId: order.id
@@ -752,16 +859,21 @@ async function submitReview() {
     ElMessage.warning('请选择评分')
     return
   }
+  if (!reviewForm.content.trim()) {
+    ElMessage.warning('请填写评价内容')
+    return
+  }
   reviewSubmitting.value = true
   try {
     await reviewApi.create({
       orderItemId: reviewTarget.value.id,
       rating: reviewForm.rating,
-      content: reviewForm.content || undefined
+      content: reviewForm.content
     })
     rememberReviewedItem(reviewTarget.value.id)
     reviewVisible.value = false
     ElMessage.success('评价已提交')
+    await refreshOrders()
   } catch (error) {
     ElMessage.error(error.message || '评价提交失败')
   } finally {
@@ -770,8 +882,8 @@ async function submitReview() {
 }
 
 function openReturn(order, item) {
-  if (!withinReturnWindow(order)) {
-    ElMessage.warning('订单已超过七天退货期限')
+  if (!canApplyReturn(order)) {
+    ElMessage.warning('当前订单状态或退款期限不允许申请')
     return
   }
   returnTarget.value = {
@@ -886,11 +998,18 @@ async function cancelOrder(order) {
 
 async function confirmOrder(order) {
   try {
+    await ElMessageBox.confirm(
+      '确认已经收到商品吗？确认后订单将完成，并可以发布评价。',
+      '确认收货',
+      { type: 'warning' }
+    )
     await orderApi.confirm(order.id)
     ElMessage.success('已确认收货')
     await refreshOrders()
   } catch (error) {
-    ElMessage.error(error.message || '确认收货失败')
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error(error.message || '确认收货失败')
+    }
   }
 }
 
@@ -1007,7 +1126,7 @@ onMounted(() => {
 
 .status-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin: 20px 0 28px;
 }
@@ -1085,6 +1204,35 @@ onMounted(() => {
   padding: 4px 16px;
 }
 
+.order-context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fffbf7;
+}
+
+.order-context div {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.order-context span {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.order-context strong {
+  min-width: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
 .order-item {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto auto;
@@ -1131,6 +1279,37 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.order-item-review {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--primary);
+  border-radius: 4px;
+  background: var(--primary-soft);
+}
+
+.order-item-review p {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.review-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.seller-reply {
+  color: var(--muted) !important;
 }
 
 .order-footer {
@@ -1276,6 +1455,10 @@ onMounted(() => {
 
   .status-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .order-context {
+    grid-template-columns: 1fr;
   }
 }
 

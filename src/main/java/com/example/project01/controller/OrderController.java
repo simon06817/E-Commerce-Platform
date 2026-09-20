@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * Buyer order endpoints: create, pay, cancel, confirm receipt and query.
  */
@@ -42,8 +44,10 @@ public class OrderController {
     public Result<Page<Order>> list(@AuthenticationPrincipal LoginUser loginUser,
                                     @RequestParam(defaultValue = "1") int page,
                                     @RequestParam(defaultValue = "10") int size,
-                                    @RequestParam(required = false) Integer status) {
-        return Result.success(orderService.getOrderPage(loginUser.getId(), page, size, status));
+                                    @RequestParam(required = false) Integer status,
+                                    @RequestParam(required = false) Boolean reviewed) {
+        return Result.success(orderService.getOrderPage(
+                loginUser.getId(), page, size, status, reviewed));
     }
 
     @Operation(summary = "Order detail", description = "buyer only")
@@ -57,10 +61,12 @@ public class OrderController {
     @Operation(summary = "Create order from cart", description = "buyer only")
     @PostMapping
     @PreAuthorize("hasRole('BUYER')")
-    public Result<OrderVO> create(@AuthenticationPrincipal LoginUser loginUser,
-                                  @RequestBody @Valid OrderCreateRequest request) {
-        Order order = orderService.createOrder(loginUser.getId(), request);
-        return Result.success(orderService.getOrderDetail(loginUser.getId(), order.getId()));
+    public Result<List<OrderVO>> create(@AuthenticationPrincipal LoginUser loginUser,
+                                        @RequestBody @Valid OrderCreateRequest request) {
+        List<Order> orders = orderService.createOrder(loginUser.getId(), request);
+        return Result.success(orders.stream()
+                .map(order -> orderService.getOrderDetail(loginUser.getId(), order.getId()))
+                .toList());
     }
 
     @Operation(summary = "Cancel order", description = "buyer only")

@@ -7,17 +7,20 @@ import com.example.project01.entity.Order;
 import com.example.project01.vo.OrderVO;
 import com.example.project01.vo.SellerStatsVO;
 
+import java.util.List;
+
 /**
  * Buyer and seller order use cases, including idempotent creation, payment,
  * cancellation, shipping and receipt confirmation.
  */
 public interface OrderService extends IService<Order> {
 
-    Page<Order> getOrderPage(Long buyerId, int current, int size, Integer status);
+    Page<Order> getOrderPage(Long buyerId, int current, int size, Integer status,
+                             Boolean reviewed);
 
     OrderVO getOrderDetail(Long buyerId, Long orderId);
 
-    Order createOrder(Long buyerId, OrderCreateRequest request);
+    List<Order> createOrder(Long buyerId, OrderCreateRequest request);
 
     void cancelOrder(Long buyerId, Long orderId);
 
@@ -32,6 +35,8 @@ public interface OrderService extends IService<Order> {
     void shipOrder(Long sellerId, Long orderId);
 
     void confirmOrder(Long buyerId, Long orderId);
+
+    int autoCompleteShippedOrders(int hours);
 
     Page<Order> getAdminOrderPage(int current, int size, String orderNo, Long buyerId, Integer status);
 

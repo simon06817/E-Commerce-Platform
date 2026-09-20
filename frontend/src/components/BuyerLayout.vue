@@ -59,7 +59,7 @@ function goLogin() {
 
 onMounted(() => {
   if (auth.role === 'BUYER') {
-    cart.load().catch(() => {})
+    cart.ensureLoaded().catch(() => {})
   }
 })
 </script>

@@ -4,17 +4,26 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.example.project01.dto.ProductRequest;
 import com.example.project01.entity.Product;
+import com.example.project01.vo.ProductRecommendationVO;
+
+import java.util.List;
 
 /**
  * Product queries, seller-owned product management and stock changes.
  */
 public interface ProductService extends IService<Product> {
 
-    Page<Product> getProductPage(int current, int size, Long categoryId, String keyword, Integer status);
+    Page<Product> getProductPage(int current, int size, Long categoryId, String keyword,
+                                 String shopName, Integer status);
+
+    Page<Product> getSellerProductPage(Long sellerId, int current, int size,
+                                       Long categoryId, String keyword, Integer status);
 
     Product getProductById(Long id);
 
     Product getProductDetail(Long id);
+
+    List<ProductRecommendationVO> getRecommendations(Long categoryId, int limit);
 
     void createProduct(Long sellerId, ProductRequest request);
 

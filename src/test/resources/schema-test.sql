@@ -85,6 +85,8 @@ CREATE TABLE order_info (
   order_no varchar(32) not null unique,
   idempotency_key varchar(64) unique,
   buyer_id bigint not null,
+  seller_id bigint,
+  checkout_group_id varchar(64),
   total_amount decimal(10,2) not null,
   status tinyint default 0,
   receiver_name varchar(50),
@@ -93,6 +95,7 @@ CREATE TABLE order_info (
   create_time timestamp default current_timestamp,
   update_time timestamp default current_timestamp,
   payment_time timestamp,
+  ship_time timestamp,
   complete_time timestamp
 );
 

@@ -70,6 +70,9 @@ app:
     expire-minutes: 30
     close-scan-interval-ms: 60000
     close-initial-delay-ms: 60000
+    auto-complete-hours: 24
+    auto-complete-scan-interval-ms: 60000
+    auto-complete-initial-delay-ms: 60000
   upload:
     dir: ${UPLOAD_DIR:./uploads}
     url-prefix: /uploads/

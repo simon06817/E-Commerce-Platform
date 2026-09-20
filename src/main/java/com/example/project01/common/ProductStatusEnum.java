@@ -7,8 +7,8 @@ import lombok.Getter;
  */
 @Getter
 public enum ProductStatusEnum {
-    OFF_SALE(0, "off sale"),
-    ON_SALE(1, "on sale");
+    OFF_SALE(0, "已下架"),
+    ON_SALE(1, "已上架");
 
     private final int code;
     private final String desc;

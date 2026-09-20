@@ -56,8 +56,8 @@ public class OrderCreatedEventListener {
         }
         notificationService.createIfAbsent(
                 orderId, EVENT_ORDER_CREATED, order.getBuyerId(), "BUYER",
-                "Order created",
-                "Your order " + order.getOrderNo() + " has been created.");
+                "订单已创建",
+                "您的订单 " + order.getOrderNo() + " 已创建。");
     }
 
     private void notifyOrderPaid(Long orderId) {
@@ -67,23 +67,32 @@ public class OrderCreatedEventListener {
         }
         notificationService.createIfAbsent(
                 orderId, EVENT_ORDER_PAID, order.getBuyerId(), "BUYER",
-                "Payment successful",
-                "Your order " + order.getOrderNo() + " has been paid.");
+                "支付成功",
+                "您的订单 " + order.getOrderNo() + " 已支付。");
 
-        List<OrderItem> items = orderItemService.lambdaQuery()
-                .eq(OrderItem::getOrderId, orderId)
-                .list();
-        List<Long> productIds = items.stream().map(OrderItem::getProductId).distinct().toList();
-        if (productIds.isEmpty()) {
+        if (order.getSellerId() == null) {
+            List<OrderItem> items = orderItemService.lambdaQuery()
+                    .eq(OrderItem::getOrderId, orderId)
+                    .list();
+            List<Long> productIds = items.stream()
+                    .map(OrderItem::getProductId)
+                    .distinct()
+                    .toList();
+            if (productIds.isEmpty()) {
+                return;
+            }
+            productService.listByIds(productIds).stream()
+                    .map(Product::getSellerId)
+                    .distinct()
+                    .forEach(sellerId -> notificationService.createIfAbsent(
+                            orderId, EVENT_ORDER_PAID, sellerId, "SELLER",
+                            "新订单已付款",
+                            "订单 " + order.getOrderNo() + " 已付款。"));
             return;
         }
-        List<Product> products = productService.listByIds(productIds);
-        products.stream()
-                .map(Product::getSellerId)
-                .distinct()
-                .forEach(sellerId -> notificationService.createIfAbsent(
-                        orderId, EVENT_ORDER_PAID, sellerId, "SELLER",
-                        "New paid order",
-                        "Order " + order.getOrderNo() + " has been paid."));
+        notificationService.createIfAbsent(
+                orderId, EVENT_ORDER_PAID, order.getSellerId(), "SELLER",
+                "新订单已付款",
+                "订单 " + order.getOrderNo() + " 已付款。");
     }
 }

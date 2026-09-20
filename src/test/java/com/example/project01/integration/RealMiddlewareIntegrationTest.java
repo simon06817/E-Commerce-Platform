@@ -215,7 +215,8 @@ class RealMiddlewareIntegrationTest {
                 .andReturn();
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         assertEquals(200, body.path("code").asInt());
-        return body.path("data").path("id").asLong();
+        JsonNode payload = body.path("data");
+        return (payload.isArray() ? payload.get(0) : payload).path("id").asLong();
     }
 
     private void awaitCondition(BooleanSupplier condition) throws InterruptedException {

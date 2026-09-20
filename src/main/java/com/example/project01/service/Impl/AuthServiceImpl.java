@@ -9,6 +9,8 @@ import com.example.project01.dto.RegisterRequest;
 import com.example.project01.entity.UserAdmin;
 import com.example.project01.entity.UserBuyer;
 import com.example.project01.entity.UserSeller;
+import com.example.project01.mapper.UserBuyerMapper;
+import com.example.project01.mapper.UserSellerMapper;
 import com.example.project01.security.JwtUtil;
 import com.example.project01.security.TokenStore;
 import com.example.project01.service.AuthService;
@@ -34,6 +36,8 @@ public class AuthServiceImpl implements AuthService {
     private final UserAdminService userAdminService;
     private final UserBuyerService userBuyerService;
     private final UserSellerService userSellerService;
+    private final UserBuyerMapper userBuyerMapper;
+    private final UserSellerMapper userSellerMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final TokenStore tokenStore;
@@ -93,32 +97,42 @@ public class AuthServiceImpl implements AuthService {
         }
         String encoded = passwordEncoder.encode(request.getPassword());
         if (request.getRole() == AuthRole.BUYER) {
-            if (userBuyerService.existsByUsername(request.getUsername())) {
+            UserBuyer existing = userBuyerMapper.selectAnyByUsername(request.getUsername());
+            if (existing != null && !isDeleted(existing.getDeleted())) {
                 throw new BusinessException(ResultCode.USER_ALREADY_EXISTS);
             }
-            UserBuyer buyer = new UserBuyer();
+            UserBuyer buyer = existing == null ? new UserBuyer() : existing;
             buyer.setUsername(request.getUsername());
             buyer.setPassword(encoded);
             buyer.setNickname(request.getNickname());
             buyer.setPhone(request.getPhone());
             buyer.setEmail(request.getEmail());
             buyer.setAddress(request.getAddress());
-            userBuyerService.save(buyer);
+            if (existing == null) {
+                userBuyerService.save(buyer);
+            } else {
+                userBuyerMapper.restoreDeleted(buyer);
+            }
 
             String displayName = buyer.getNickname() == null || buyer.getNickname().isBlank()
                     ? buyer.getUsername() : buyer.getNickname();
             return issueTokens(new LoginUser(buyer.getId(), buyer.getUsername(), AuthRole.BUYER), displayName);
         } else {
-            if (userSellerService.existsByUsername(request.getUsername())) {
+            UserSeller existing = userSellerMapper.selectAnyByUsername(request.getUsername());
+            if (existing != null && !isDeleted(existing.getDeleted())) {
                 throw new BusinessException(ResultCode.USER_ALREADY_EXISTS);
             }
-            UserSeller seller = new UserSeller();
+            UserSeller seller = existing == null ? new UserSeller() : existing;
             seller.setUsername(request.getUsername());
             seller.setPassword(encoded);
             seller.setShopName(request.getShopName());
             seller.setPhone(request.getPhone());
             seller.setEmail(request.getEmail());
-            userSellerService.save(seller);
+            if (existing == null) {
+                userSellerService.save(seller);
+            } else {
+                userSellerMapper.restoreDeleted(seller);
+            }
 
             String displayName = seller.getShopName() == null || seller.getShopName().isBlank()
                     ? seller.getUsername() : seller.getShopName();
@@ -170,5 +184,9 @@ public class AuthServiceImpl implements AuthService {
                 displayName,
                 jwtUtil.getAccessExpireSeconds(),
                 jwtUtil.getRefreshExpireSeconds());
+    }
+
+    private boolean isDeleted(Integer deleted) {
+        return deleted != null && deleted == 1;
     }
 }

@@ -24,6 +24,9 @@
             <UserRound v-else :size="18" />
           </div>
           <div class="message-bubble">
+            <div v-if="message.status" class="stream-status">
+              {{ message.status }}
+            </div>
             <div class="message-content">{{ message.content }}</div>
             <div v-if="message.productIds?.length" class="product-links">
               <el-button
@@ -76,24 +79,26 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { Bot, Send, UserRound } from 'lucide-vue-next'
 import BuyerLayout from '../components/BuyerLayout.vue'
-import { agentApi } from '../api'
+import { useAssistantStore } from '../stores/assistant'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const auth = useAuthStore()
+const assistant = useAssistantStore()
 const draft = ref('')
-const sending = ref(false)
 const messageList = ref(null)
-const messages = ref([
-  {
-    id: 'welcome',
-    role: 'assistant',
-    content: '你好，我是暖集 AI 助手。'
-  }
-])
+const conversationKey = computed(() => `${auth.role}:${auth.userId}`)
+const messages = computed(
+  () => assistant.get(conversationKey.value)?.messages || []
+)
+const sending = computed(
+  () => assistant.get(conversationKey.value)?.sending || false
+)
+assistant.ensure(conversationKey.value, '你好，我是暖集 AI 助手。')
 
 function scrollToBottom() {
   nextTick(() => {
@@ -106,30 +111,10 @@ function scrollToBottom() {
 async function send() {
   const content = draft.value.trim()
   if (!content || sending.value) return
-  messages.value.push({
-    id: `user-${Date.now()}`,
-    role: 'user',
-    content
-  })
   draft.value = ''
-  sending.value = true
   scrollToBottom()
-
-  try {
-    const data = await agentApi.chat(content)
-    messages.value.push({
-      id: `assistant-${Date.now()}`,
-      role: 'assistant',
-      content: data.answer || '暂时无法回答。',
-      productIds: data.product_ids || [],
-      pendingAction: data.pending_action
-    })
-  } catch (error) {
-    ElMessage.error(error.response?.data?.detail || error.message || 'AI 服务暂不可用')
-  } finally {
-    sending.value = false
-    scrollToBottom()
-  }
+  await assistant.send(conversationKey.value, content)
+  scrollToBottom()
 }
 </script>
 
@@ -225,6 +210,12 @@ async function send() {
 .message-content {
   line-height: 1.65;
   white-space: pre-wrap;
+}
+
+.stream-status {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .product-links {

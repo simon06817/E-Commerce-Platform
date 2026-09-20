@@ -36,7 +36,8 @@ public class OrderReturnController {
 
     private final OrderReturnService orderReturnService;
 
-    @Operation(summary = "Apply for return", description = "completed order and seven-day window required")
+    @Operation(summary = "Apply for refund",
+            description = "available after shipment, or within seven days after completion")
     @PostMapping
     public Result<ReturnVO> apply(@AuthenticationPrincipal LoginUser loginUser,
                                   @RequestBody @Valid ReturnApplyRequest request) {

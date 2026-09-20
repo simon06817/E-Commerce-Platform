@@ -7,25 +7,27 @@ import lombok.Getter;
  */
 @Getter
 public enum ResultCode {
-    SUCCESS(200, "success"),
-    BAD_REQUEST(400, "bad request"),
-    UNAUTHORIZED(401, "unauthorized"),
-    FORBIDDEN(403, "forbidden"),
-    NOT_FOUND(404, "resource not found"),
-    INTERNAL_SERVER_ERROR(500, "internal server error"),
-    TOO_MANY_REQUESTS(429, "too many requests"),
+    SUCCESS(200, "操作成功"),
+    BAD_REQUEST(400, "请求参数错误"),
+    UNAUTHORIZED(401, "登录状态已失效，请重新登录"),
+    FORBIDDEN(403, "没有权限执行此操作"),
+    NOT_FOUND(404, "请求的资源不存在"),
+    INTERNAL_SERVER_ERROR(500, "服务器内部错误，请稍后重试"),
+    TOO_MANY_REQUESTS(429, "操作过于频繁，请稍后再试"),
 
-    USER_NOT_EXIST(1001, "user does not exist"),
-    PRODUCT_NOT_EXIST(1002, "product does not exist"),
-    STOCK_INSUFFICIENT(1003, "insufficient stock"),
-    CATEGORY_HAS_CHILDREN(1004, "category has children or products, cannot delete"),
-    CART_ITEM_NOT_FOUND(1005, "cart item does not exist"),
-    USERNAME_OR_PASSWORD_ERROR(1006, "username or password is wrong"),
-    USER_ALREADY_EXISTS(1007, "username already exists"),
-    PRODUCT_NOT_OWNED(1008, "product is not owned by current seller"),
-    INVALID_ROLE(1009, "invalid role"),
-    REVIEW_NOT_ALLOWED(1010, "only completed orders can be reviewed"),
-    REVIEW_ALREADY_EXISTS(1011, "this order item has already been reviewed");
+    USER_NOT_EXIST(1001, "用户不存在"),
+    PRODUCT_NOT_EXIST(1002, "商品不存在"),
+    STOCK_INSUFFICIENT(1003, "商品库存不足"),
+    CATEGORY_HAS_CHILDREN(1004, "分类下存在子分类或商品，无法删除"),
+    CART_ITEM_NOT_FOUND(1005, "购物车商品不存在"),
+    USERNAME_OR_PASSWORD_ERROR(1006, "用户名或密码错误"),
+    USER_ALREADY_EXISTS(1007, "用户名已存在"),
+    PRODUCT_NOT_OWNED(1008, "该商品不属于当前卖家"),
+    INVALID_ROLE(1009, "用户角色无效"),
+    REVIEW_NOT_ALLOWED(1010, "确认收货后才能发布评价"),
+    REVIEW_ALREADY_EXISTS(1011, "该订单商品已经评价过了"),
+    REFUNDED_PRODUCT_CANNOT_REVIEW(1012, "已退款商品不能评价"),
+    BUYER_PROFILE_INCOMPLETE(1013, "请先补全个人信息后再下单");
 
     private final int code;
     private final String message;

@@ -9,6 +9,7 @@ import {
   saveSession,
   setAvatarUrl
 } from '../api/session'
+import { useAssistantStore } from './assistant'
 
 export const useAuthStore = defineStore('auth', () => {
   const session = ref(getSession())
@@ -47,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
     } finally {
       clearSession()
       session.value = null
+      useAssistantStore().clearAll()
     }
   }
 

@@ -103,6 +103,8 @@ CREATE TABLE `order_info` (
     `order_no`         varchar(32)    NOT NULL,
     `idempotency_key`  varchar(64)    DEFAULT NULL,
     `buyer_id`         bigint         NOT NULL COMMENT 'user_buyer.id',
+    `seller_id`        bigint         DEFAULT NULL COMMENT 'user_seller.id for newly split orders',
+    `checkout_group_id` varchar(64)   DEFAULT NULL COMMENT 'one buyer checkout submission',
     `total_amount`     decimal(10, 2) NOT NULL,
     `status`           tinyint        DEFAULT 0 COMMENT '0 unpaid, 1 paid, 2 shipped, 3 completed, 4 canceled',
     `receiver_name`    varchar(50)    DEFAULT NULL,
@@ -111,11 +113,14 @@ CREATE TABLE `order_info` (
     `create_time`      datetime       DEFAULT CURRENT_TIMESTAMP,
     `update_time`      datetime       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `payment_time`     datetime       DEFAULT NULL,
+    `ship_time`        datetime       DEFAULT NULL,
     `complete_time`    datetime       DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_no` (`order_no`),
     UNIQUE KEY `uk_idempotency_key` (`idempotency_key`),
     KEY `idx_buyer_id` (`buyer_id`),
+    KEY `idx_order_seller_id` (`seller_id`),
+    KEY `idx_buyer_checkout_group` (`buyer_id`, `checkout_group_id`),
     KEY `idx_status_create_time` (`status`, `create_time`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 

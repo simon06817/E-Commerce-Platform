@@ -7,6 +7,7 @@ import com.example.project01.common.ResultCode;
 import com.example.project01.dto.ProductRequest;
 import com.example.project01.entity.Product;
 import com.example.project01.service.ProductService;
+import com.example.project01.vo.ProductRecommendationVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * Public product browsing and seller-owned product management endpoints.
@@ -43,8 +46,19 @@ public class ProductController {
                                       @RequestParam(defaultValue = "10") int size,
                                       @RequestParam(required = false) Long categoryId,
                                       @RequestParam(required = false) String keyword,
+                                      @RequestParam(required = false) String shopName,
                                       @RequestParam(required = false) Integer status) {
-        return Result.success(productService.getProductPage(page, size, categoryId, keyword, status));
+        return Result.success(
+                productService.getProductPage(page, size, categoryId, keyword, shopName, status));
+    }
+
+    @Operation(summary = "Recommend products",
+            description = "public, ranked by paid sales and review rating")
+    @GetMapping("/recommendations")
+    public Result<List<ProductRecommendationVO>> recommendations(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "5") int limit) {
+        return Result.success(productService.getRecommendations(categoryId, limit));
     }
 
     @Operation(summary = "Product detail", description = "public")

@@ -41,15 +41,95 @@ const routes = [
   },
   {
     path: '/seller',
-    name: 'seller-placeholder',
-    component: () => import('../views/SellerPlaceholderView.vue'),
-    meta: { requiresAuth: true, role: 'SELLER' }
+    component: () => import('../components/SellerLayout.vue'),
+    meta: { requiresAuth: true, role: 'SELLER' },
+    children: [
+      {
+        path: '',
+        redirect: '/seller/dashboard'
+      },
+      {
+        path: 'dashboard',
+        name: 'seller-dashboard',
+        component: () => import('../views/SellerDashboardView.vue')
+      },
+      {
+        path: 'products',
+        name: 'seller-products',
+        component: () => import('../views/SellerProductsView.vue')
+      },
+      {
+        path: 'orders',
+        name: 'seller-orders',
+        component: () => import('../views/SellerOrdersView.vue')
+      },
+      {
+        path: 'returns',
+        name: 'seller-returns',
+        component: () => import('../views/SellerReturnsView.vue')
+      },
+      {
+        path: 'reviews',
+        name: 'seller-reviews',
+        component: () => import('../views/SellerReviewsView.vue')
+      },
+      {
+        path: 'profile',
+        name: 'seller-profile',
+        component: () => import('../views/SellerProfileView.vue')
+      },
+      {
+        path: 'assistant',
+        name: 'seller-assistant',
+        component: () => import('../views/SellerAssistantView.vue')
+      }
+    ]
   },
   {
     path: '/admin',
-    name: 'admin-placeholder',
-    component: () => import('../views/AdminPlaceholderView.vue'),
-    meta: { requiresAuth: true, role: 'ADMIN' }
+    component: () => import('../components/AdminLayout.vue'),
+    meta: { requiresAuth: true, role: 'ADMIN' },
+    children: [
+      {
+        path: '',
+        redirect: '/admin/dashboard'
+      },
+      {
+        path: 'dashboard',
+        name: 'admin-dashboard',
+        component: () => import('../views/AdminDashboardView.vue')
+      },
+      {
+        path: 'orders',
+        name: 'admin-orders',
+        component: () => import('../views/AdminOrdersView.vue')
+      },
+      {
+        path: 'buyers',
+        name: 'admin-buyers',
+        component: () => import('../views/AdminBuyersView.vue')
+      },
+      {
+        path: 'sellers',
+        name: 'admin-sellers',
+        component: () => import('../views/AdminSellersView.vue')
+      },
+      {
+        path: 'categories',
+        name: 'admin-categories',
+        component: () => import('../views/AdminCategoriesView.vue')
+      },
+      {
+        path: 'assistant',
+        name: 'admin-assistant',
+        component: () => import('../views/AdminAssistantView.vue')
+      },
+      {
+        path: 'profile',
+        name: 'admin-profile',
+        component: () => import('../views/AdminProfileView.vue')
+      }
+    ]
   },
   {
     path: '/:pathMatch(.*)*',

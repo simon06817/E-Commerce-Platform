@@ -1,4 +1,5 @@
 import json
+import re
 from contextvars import ContextVar
 from typing import Any
 
@@ -14,12 +15,43 @@ _proposed_actions: ContextVar[list[dict[str, Any]] | None] = ContextVar(
 )
 
 _ORDER_STATUS_TEXT = {
-    0: "UNPAID",
-    1: "PAID",
-    2: "SHIPPED",
-    3: "COMPLETED",
-    4: "CANCELED",
+    0: "待付款",
+    1: "待发货",
+    2: "待收货",
+    3: "已完成",
+    4: "已取消",
 }
+
+_PRODUCT_STATUS_TEXT = {
+    0: "下架",
+    1: "上架",
+}
+
+_CATEGORY_STATUS_TEXT = {
+    0: "停用",
+    1: "启用",
+}
+
+# The model sometimes keeps "shop7 的" inside the product keyword. Pull that
+# seller reference out before querying so product name and shop name remain
+# independent filters.
+_SHOP_REFERENCE = re.compile(r"(?i)((?:shop|店铺)\s*[-_]?\s*\d+)")
+
+
+def split_product_query(keyword: str | None,
+                        shop_name: str | None = None) -> tuple[str, str | None]:
+    """Return (product keyword, shop name) for natural-language product queries."""
+    product_keyword = (keyword or "").strip()
+    resolved_shop = (shop_name or "").strip() or None
+    if not resolved_shop and product_keyword:
+        match = _SHOP_REFERENCE.search(product_keyword)
+        if match:
+            resolved_shop = match.group(1).strip()
+            product_keyword = (
+                product_keyword[:match.start()] + " " + product_keyword[match.end():]
+            ).strip()
+            product_keyword = re.sub(r"^\s*(?:的|是|在)\s*", "", product_keyword)
+    return product_keyword.strip(), resolved_shop
 
 
 def set_user_token(token: str):
@@ -60,7 +92,7 @@ def _request(
     if auth:
         token = _user_token.get()
         if not token:
-            return "ERROR: missing user token"
+            return "错误：缺少用户登录令牌"
         headers["Authorization"] = token
 
     url = config.java_api_base_url.rstrip("/") + path
@@ -93,16 +125,76 @@ def _enrich_order_status(raw: str) -> str:
     return json.dumps(body, ensure_ascii=False)
 
 
+def _enrich_product_status(raw: str) -> str:
+    """给商品 JSON 补充上下架文本，避免与订单状态混淆。"""
+    body = json.loads(raw)
+    data = body.get("data")
+
+    def enrich(product: dict) -> None:
+        if isinstance(product, dict) and product.get("status") is not None:
+            product["statusText"] = _PRODUCT_STATUS_TEXT.get(
+                int(product["status"]), "未知状态"
+            )
+
+    if isinstance(data, dict) and isinstance(data.get("records"), list):
+        for product in data["records"]:
+            enrich(product)
+    elif isinstance(data, dict):
+        enrich(data)
+    return json.dumps(body, ensure_ascii=False)
+
+
+def _enrich_category_status(raw: str) -> str:
+    """给分类 JSON 补充启用状态文本。"""
+    body = json.loads(raw)
+    data = body.get("data")
+
+    def enrich(category: dict) -> None:
+        if isinstance(category, dict) and category.get("status") is not None:
+            category["statusText"] = _CATEGORY_STATUS_TEXT.get(
+                int(category["status"]), "未知状态"
+            )
+
+    if isinstance(data, dict) and isinstance(data.get("records"), list):
+        for category in data["records"]:
+            enrich(category)
+    elif isinstance(data, list):
+        for category in data:
+            enrich(category)
+    elif isinstance(data, dict):
+        enrich(data)
+    return json.dumps(body, ensure_ascii=False)
+
+
 @tool
-def search_products(keyword: str) -> str:
-    """按关键词搜索商品。"""
-    return _request("GET", "/api/products", params={"keyword": keyword, "page": 1, "size": 10})
+def search_products(keyword: str | None = None,
+                    shop_name: str | None = None) -> str:
+    """搜索商品。商品名或描述放入 keyword，店铺名放入 shop_name，不要拼在一起。"""
+    product_keyword, resolved_shop = split_product_query(keyword, shop_name)
+    params = {"page": 1, "size": 10}
+    if product_keyword:
+        params["keyword"] = product_keyword
+    if resolved_shop:
+        params["shopName"] = resolved_shop
+    return _enrich_product_status(
+        _request("GET", "/api/products", params=params))
 
 
 @tool
 def get_product_detail(product_id: int) -> str:
     """按商品 id 查询商品详情。"""
-    return _request("GET", f"/api/products/{product_id}")
+    return _enrich_product_status(
+        _request("GET", f"/api/products/{product_id}"))
+
+
+@tool
+def get_product_recommendations(category_id: int | None = None,
+                                limit: int = 5) -> str:
+    """按真实付款销量和评价表现推荐商品，可按分类编号筛选。"""
+    params = {"limit": max(1, min(limit, 20))}
+    if category_id is not None:
+        params["categoryId"] = category_id
+    return _request("GET", "/api/products/recommendations", params=params)
 
 
 @tool
@@ -167,9 +259,9 @@ def mark_notification_read(notification_id: int) -> str:
     """提出将通知标记为已读，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "mark_notification_read", "notification_id": notification_id})
-    return "PROPOSED: mark notification as read. Waiting for user confirmation."
+    return "已提出将通知标记为已读，等待用户确认。"
 
 
 @tool
@@ -177,9 +269,9 @@ def add_to_cart(product_id: int, num: int = 1) -> str:
     """提出加入购物车请求，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "add_to_cart", "product_id": product_id, "num": num})
-    return "PROPOSED: add product to cart. Waiting for user confirmation."
+    return "已提出将商品加入购物车，等待用户确认。"
 
 
 @tool
@@ -187,9 +279,9 @@ def cancel_order(order_id: int) -> str:
     """提出取消订单请求，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "cancel_order", "order_id": order_id})
-    return "PROPOSED: cancel order. Waiting for user confirmation."
+    return "已提出取消订单，等待用户确认。"
 
 
 @tool
@@ -197,9 +289,9 @@ def apply_return(order_item_id: int, reason: str) -> str:
     """提出退货申请，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "apply_return", "order_item_id": order_item_id, "reason": reason})
-    return "PROPOSED: apply return. Waiting for user confirmation."
+    return "已提出退款申请，等待用户确认。"
 
 
 @tool
@@ -207,9 +299,9 @@ def cancel_return(return_id: int) -> str:
     """提出撤销退货申请，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "cancel_return", "return_id": return_id})
-    return "PROPOSED: cancel return. Waiting for user confirmation."
+    return "已提出撤销退款申请，等待用户确认。"
 
 
 @tool
@@ -228,6 +320,18 @@ def get_seller_returns() -> str:
 
 
 @tool
+def get_seller_products(keyword: str | None = None, status: int | None = None) -> str:
+    """查询当前卖家自己的商品，可按关键词和上下架状态筛选。"""
+    params = {"page": 1, "size": 20}
+    if keyword:
+        params["keyword"] = keyword
+    if status is not None:
+        params["status"] = status
+    return _enrich_product_status(
+        _request("GET", "/api/seller/products", auth=True, params=params))
+
+
+@tool
 def get_seller_stats(range: str = "30d") -> str:
     """查询当前卖家的收入统计，range 可为 today/7d/30d/all。"""
     return _request("GET", "/api/seller/stats", auth=True, params={"range": range})
@@ -238,9 +342,9 @@ def approve_return(return_id: int, note: str = "") -> str:
     """提出同意退货，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "approve_return", "return_id": return_id, "note": note})
-    return "PROPOSED: approve return. Waiting for user confirmation."
+    return "已提出同意退款，等待用户确认。"
 
 
 @tool
@@ -248,9 +352,76 @@ def reject_return(return_id: int, note: str = "") -> str:
     """提出拒绝退货，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "reject_return", "return_id": return_id, "note": note})
-    return "PROPOSED: reject return. Waiting for user confirmation."
+    return "已提出拒绝退款，等待用户确认。"
+
+
+@tool
+def ship_order(order_id: int) -> str:
+    """提出给已付款订单发货，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({"type": "ship_order", "order_id": order_id})
+    return "已提出订单发货，等待用户确认。"
+
+
+@tool
+def create_product(name: str, description: str, price: float, stock: int,
+                   category_id: int, main_image: str = "") -> str:
+    """提出新增商品，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({
+        "type": "create_product",
+        "name": name,
+        "description": description,
+        "price": price,
+        "stock": stock,
+        "category_id": category_id,
+        "main_image": main_image,
+    })
+    return "已提出新增商品，等待用户确认。"
+
+
+@tool
+def update_product_stock(product_id: int, stock: int) -> str:
+    """提出修改商品库存，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({
+        "type": "update_product_stock",
+        "product_id": product_id,
+        "stock": stock,
+    })
+    return "已提出修改商品库存，等待用户确认。"
+
+
+@tool
+def set_product_status(product_id: int, status: int) -> str:
+    """提出商品上架或下架，status 为 1 表示上架、0 表示下架。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({
+        "type": "set_product_status",
+        "product_id": product_id,
+        "status": status,
+    })
+    return "已提出修改商品上下架状态，等待用户确认。"
+
+
+@tool
+def delete_product(product_id: int) -> str:
+    """提出删除商品，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({"type": "delete_product", "product_id": product_id})
+    return "已提出删除商品，等待用户确认。"
 
 
 @tool
@@ -258,18 +429,64 @@ def reply_review(review_id: int, content: str) -> str:
     """提出回复评价，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "reply_review", "review_id": review_id, "content": content})
-    return "PROPOSED: reply review. Waiting for user confirmation."
+    return "已提出回复评价，等待用户确认。"
 
 
 @tool
-def get_admin_orders(status: int | None = None) -> str:
-    """管理员查询全部订单，需要管理员登录态。"""
+def get_admin_orders(status: int | None = None,
+                     order_no: str | None = None,
+                     buyer_id: int | None = None) -> str:
+    """管理员查询全部订单，可按状态、订单号和买家 ID 筛选。"""
     params = {"page": 1, "size": 10}
     if status is not None:
         params["status"] = status
+    if order_no:
+        params["orderNo"] = order_no
+    if buyer_id is not None:
+        params["buyerId"] = buyer_id
     return _enrich_order_status(_request("GET", "/api/admin/orders", auth=True, params=params))
+
+
+@tool
+def get_admin_order_detail(order_id: int) -> str:
+    """管理员查询指定订单详情，需要管理员登录态。"""
+    return _enrich_order_status(
+        _request("GET", f"/api/admin/orders/{order_id}", auth=True))
+
+
+@tool
+def get_admin_buyers(keyword: str | None = None) -> str:
+    """管理员查询买家账号，可按账号、昵称或手机号搜索。"""
+    params = {"page": 1, "size": 10}
+    if keyword:
+        params["keyword"] = keyword
+    return _request(
+        "GET", "/api/admin/users/buyers", auth=True, params=params)
+
+
+@tool
+def get_admin_sellers(keyword: str | None = None) -> str:
+    """管理员查询卖家账号，可按账号、店铺名或手机号搜索。"""
+    params = {"page": 1, "size": 10}
+    if keyword:
+        params["keyword"] = keyword
+    return _request(
+        "GET", "/api/admin/users/sellers", auth=True, params=params)
+
+
+@tool
+def get_admin_categories(name: str | None = None,
+                         status: int | None = None) -> str:
+    """管理员查询全部分类，包括已停用分类。"""
+    params = {"page": 1, "size": 20}
+    if name:
+        params["name"] = name
+    if status is not None:
+        params["status"] = status
+    return _enrich_category_status(
+        _request("GET", "/api/admin/categories", auth=True, params=params))
 
 
 @tool
@@ -277,9 +494,91 @@ def force_cancel_order(order_id: int) -> str:
     """提出管理员强制关单，必须在用户确认后才会真正执行。"""
     actions = _proposed_actions.get()
     if actions is None:
-        return "ERROR: action context is not available"
+        return "错误：当前请求无法收集待确认操作"
     actions.append({"type": "force_cancel_order", "order_id": order_id})
-    return "PROPOSED: force cancel order. Waiting for user confirmation."
+    return "已提出强制关单，等待用户确认。"
+
+
+@tool
+def delete_buyer(buyer_id: int) -> str:
+    """提出删除买家账号，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({"type": "delete_buyer", "buyer_id": buyer_id})
+    return "已提出删除买家账号，等待用户确认。"
+
+
+@tool
+def delete_seller(seller_id: int) -> str:
+    """提出删除卖家账号，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({"type": "delete_seller", "seller_id": seller_id})
+    return "已提出删除卖家账号，等待用户确认。"
+
+
+@tool
+def create_category(name: str, parent_id: int = 0, sort_order: int = 0,
+                    status: int = 1) -> str:
+    """提出新增商品分类，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({
+        "type": "create_category",
+        "name": name,
+        "parent_id": parent_id,
+        "sort_order": sort_order,
+        "status": status,
+    })
+    return "已提出新增分类，等待用户确认。"
+
+
+@tool
+def update_category(category_id: int, name: str, parent_id: int = 0,
+                    sort_order: int = 0, status: int = 1) -> str:
+    """提出修改商品分类，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({
+        "type": "update_category",
+        "category_id": category_id,
+        "name": name,
+        "parent_id": parent_id,
+        "sort_order": sort_order,
+        "status": status,
+    })
+    return "已提出修改分类，等待用户确认。"
+
+
+@tool
+def set_category_status(category_id: int, status: int) -> str:
+    """提出启用或停用分类，status 为 1 表示启用、0 表示停用。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({
+        "type": "set_category_status",
+        "category_id": category_id,
+        "status": status,
+    })
+    return "已提出修改分类状态，等待用户确认。"
+
+
+@tool
+def delete_category(category_id: int) -> str:
+    """提出删除商品分类，必须在用户确认后才会真正执行。"""
+    actions = _proposed_actions.get()
+    if actions is None:
+        return "错误：当前请求无法收集待确认操作"
+    actions.append({
+        "type": "delete_category",
+        "category_id": category_id,
+    })
+    return "已提出删除分类，等待用户确认。"
 
 
 def build_tools(role: str | None = None):
@@ -287,6 +586,7 @@ def build_tools(role: str | None = None):
     common = [
         search_products,
         get_product_detail,
+        get_product_recommendations,
         get_categories,
         get_product_reviews,
         get_product_rating_summary,
@@ -307,14 +607,30 @@ def build_tools(role: str | None = None):
     seller = [
         get_seller_orders,
         get_seller_returns,
+        get_seller_products,
         get_seller_stats,
+        ship_order,
         approve_return,
         reject_return,
         reply_review,
+        create_product,
+        update_product_stock,
+        set_product_status,
+        delete_product,
     ]
     admin = [
         get_admin_orders,
+        get_admin_order_detail,
+        get_admin_buyers,
+        get_admin_sellers,
+        get_admin_categories,
         force_cancel_order,
+        delete_buyer,
+        delete_seller,
+        create_category,
+        update_category,
+        set_category_status,
+        delete_category,
     ]
     role_tools = {
         "BUYER": buyer,
@@ -359,6 +675,51 @@ def execute_proposed_action(action: dict[str, Any]) -> str:
             auth=True,
             json_body={"note": action.get("note", "")},
         )
+    if action_type == "ship_order":
+        return _request(
+            "PUT", f"/api/seller/orders/{action['order_id']}/ship", auth=True)
+    if action_type == "create_product":
+        return _request(
+            "POST",
+            "/api/products",
+            auth=True,
+            json_body={
+                "name": action["name"],
+                "description": action.get("description", ""),
+                "price": action["price"],
+                "stock": action["stock"],
+                "categoryId": action["category_id"],
+                "mainImage": action.get("main_image") or None,
+                "status": 1,
+            },
+        )
+    if action_type == "update_product_stock":
+        raw = _request("GET", f"/api/products/{action['product_id']}")
+        body = json.loads(raw)
+        product = body.get("data") or {}
+        return _request(
+            "PUT",
+            f"/api/products/{action['product_id']}",
+            auth=True,
+            json_body={
+                "name": product.get("name"),
+                "description": product.get("description"),
+                "price": product.get("price"),
+                "stock": action["stock"],
+                "categoryId": product.get("categoryId"),
+                "mainImage": product.get("mainImage"),
+                "status": product.get("status"),
+            },
+        )
+    if action_type == "set_product_status":
+        return _request(
+            "PUT",
+            f"/api/products/{action['product_id']}/status/{action['status']}",
+            auth=True,
+        )
+    if action_type == "delete_product":
+        return _request(
+            "DELETE", f"/api/products/{action['product_id']}", auth=True)
     if action_type == "reply_review":
         return _request(
             "PUT",
@@ -368,7 +729,47 @@ def execute_proposed_action(action: dict[str, Any]) -> str:
         )
     if action_type == "force_cancel_order":
         return _request("PUT", f"/api/admin/orders/{action['order_id']}/force-cancel", auth=True)
+    if action_type == "delete_buyer":
+        return _request(
+            "DELETE", f"/api/admin/users/buyers/{action['buyer_id']}", auth=True)
+    if action_type == "delete_seller":
+        return _request(
+            "DELETE", f"/api/admin/users/sellers/{action['seller_id']}", auth=True)
+    if action_type == "create_category":
+        return _request(
+            "POST",
+            "/api/categories",
+            auth=True,
+            json_body={
+                "name": action["name"],
+                "parentId": action.get("parent_id", 0),
+                "sortOrder": action.get("sort_order", 0),
+                "status": action.get("status", 1),
+            },
+        )
+    if action_type == "update_category":
+        return _request(
+            "PUT",
+            f"/api/categories/{action['category_id']}",
+            auth=True,
+            json_body={
+                "id": action["category_id"],
+                "name": action["name"],
+                "parentId": action.get("parent_id", 0),
+                "sortOrder": action.get("sort_order", 0),
+                "status": action.get("status", 1),
+            },
+        )
+    if action_type == "set_category_status":
+        return _request(
+            "PUT",
+            f"/api/categories/{action['category_id']}/status/{action['status']}",
+            auth=True,
+        )
+    if action_type == "delete_category":
+        return _request(
+            "DELETE", f"/api/categories/{action['category_id']}", auth=True)
     if action_type == "mark_notification_read":
         return _request(
             "PUT", f"/api/notifications/{action['notification_id']}/read", auth=True)
-    return "ERROR: unsupported action"
+    return "错误：不支持该操作"

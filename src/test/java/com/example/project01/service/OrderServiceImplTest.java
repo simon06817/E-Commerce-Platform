@@ -5,7 +5,9 @@ import com.example.project01.entity.Cart;
 import com.example.project01.entity.Order;
 import com.example.project01.entity.OrderItem;
 import com.example.project01.entity.Product;
+import com.example.project01.entity.UserBuyer;
 import com.example.project01.mapper.OrderMapper;
+import com.example.project01.mapper.ProductReviewMapper;
 import com.example.project01.service.Impl.OrderServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,15 @@ class OrderServiceImplTest {
     @Mock
     private OrderMapper orderMapper;
 
+    @Mock
+    private ProductReviewMapper productReviewMapper;
+
+    @Mock
+    private UserBuyerService userBuyerService;
+
+    @Mock
+    private UserSellerService userSellerService;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
@@ -53,6 +64,14 @@ class OrderServiceImplTest {
 
     @Test
     void createOrderFromCart() {
+        UserBuyer buyer = new UserBuyer();
+        buyer.setId(1L);
+        buyer.setNickname("buyer one");
+        buyer.setPhone("13800000001");
+        buyer.setEmail("buyer01@example.com");
+        buyer.setAddress("Beijing");
+        when(userBuyerService.getById(1L)).thenReturn(buyer);
+
         Cart cart = new Cart();
         cart.setId(5L);
         cart.setBuyerId(1L);
@@ -63,6 +82,7 @@ class OrderServiceImplTest {
 
         Product product = new Product();
         product.setId(10L);
+        product.setSellerId(1L);
         product.setName("iPhone 15");
         product.setPrice(new BigDecimal("5999.00"));
         product.setStatus(1);
@@ -88,6 +108,13 @@ class OrderServiceImplTest {
 
     @Test
     void createOrderWithEmptyCartFails() {
+        UserBuyer buyer = new UserBuyer();
+        buyer.setId(1L);
+        buyer.setNickname("buyer one");
+        buyer.setPhone("13800000001");
+        buyer.setEmail("buyer01@example.com");
+        buyer.setAddress("Beijing");
+        when(userBuyerService.getById(1L)).thenReturn(buyer);
         when(cartService.getCartList(1L)).thenReturn(List.of());
         OrderCreateRequest request = new OrderCreateRequest();
         request.setIdempotencyKey("order-key-002");

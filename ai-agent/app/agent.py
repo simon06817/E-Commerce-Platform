@@ -13,8 +13,9 @@ from app.tools import build_tools
 MAX_MEMORY_MESSAGES = 20
 
 _ACCOUNT_KEYWORDS = (
-    "order", "cart", "return", "notification", "ship", "statistics",
+    "order", "cart", "return", "notification", "ship", "statistics", "product",
     "订单", "购物车", "退货", "通知", "发货", "统计", "取消", "支付",
+    "商品管理", "库存", "上架", "下架", "买家", "卖家", "分类", "用户", "账号",
 )
 
 
@@ -35,11 +36,19 @@ def _model() -> ChatOllama:
         model=config.ollama_model,
         base_url=config.ollama_base_url,
         temperature=0.2,
+        num_ctx=8192,
+        num_predict=768,
+        keep_alive="30m",
+        sync_client_kwargs={"timeout": 120},
     )
 
 
 def _extract_ai_answer(result: dict) -> str:
     """Pick the last non-empty AI message, skipping tool payloads."""
+    fallback_prefixes = (
+        "sorry, need more steps to process this request.",
+        "i could not generate an answer from the available facts.",
+    )
     for message in reversed(result.get("messages", [])):
         message_type = (getattr(message, "type", "") or message.__class__.__name__).lower()
         if message_type not in ("ai", "aimessage"):
@@ -52,28 +61,38 @@ def _extract_ai_answer(result: dict) -> str:
                 if isinstance(block, dict) and block.get("text")
             )
         if isinstance(content, str) and content.strip():
-            return content.strip()
-    return "I could not generate an answer from the available facts."
+            answer = content.strip()
+            if answer.lower() in fallback_prefixes:
+                return "暂时无法根据现有信息生成回答，请换一种更简洁的问法后重试。"
+            return answer
+    return "暂时无法根据现有信息生成回答。"
 
 
 def _build_prompt(question: str, facts: list[str], intent: str) -> str:
     """Give the model facts plus intent-specific tool instructions."""
-    fact_text = "\n".join(facts) if facts else "No retrieved facts."
+    fact_text = "\n".join(facts) if facts else "暂无检索结果。"
     if intent == "account":
         extra = (
-            "This is an account-related question. Use the authenticated tools for "
-            "orders, cart, returns and notifications. Never invent account data."
+            "这是账户相关问题。请使用已登录身份对应的工具查询订单、购物车、"
+            "退款和通知，不得编造账户数据。"
+            "把商品加入购物车时，必须先用商品名和店铺名搜索并取得真实商品 ID，"
+            "再调用 add_to_cart；不得把店铺名和商品名拼成一个搜索关键词。"
         )
     else:
         extra = (
-            "This is a catalog question. Use product, category and review facts. "
-            "Never invent price, stock or review content."
+            "这是商品相关问题。请依据商品、分类和评价事实回答，"
+            "不得编造价格、库存或评价内容。"
         )
     return (
-        "You are an e-commerce assistant. Answer only from the Facts below and from "
-        f"successful tool results. {extra}\n\n"
-        f"Facts:\n{fact_text}\n\n"
-        f"User question: {question}"
+        "你是电商平台的中文智能助手。必须使用简体中文回答，"
+        "你是平台 AI 助手，不是用户本人；用户资料只能称为“您的”资料，"
+        "不得把用户名或昵称说成自己的名字。"
+        "只能依据下面的事实和工具成功返回的数据作答。"
+        "下方事实是已经通过后端接口获取的权威数据，"
+        "如果事实已经包含答案，不要重复调用工具覆盖它。"
+        f"{extra}\n\n"
+        f"事实：\n{fact_text}\n\n"
+        f"用户问题：{question}"
     )
 
 
@@ -93,10 +112,12 @@ def _agent_node(state: AgentState) -> dict:
     """Run the ReAct agent with role-scoped tools and persist the exchange."""
     intent = state.get("intent", "catalog")
     prompt = _build_prompt(state.get("question", ""), state.get("facts", []), intent)
+    messages = state.get("messages", []) + [("user", prompt)]
     agent = create_react_agent(_model(), build_tools(state.get("role")))
-    result = agent.invoke({
-        "messages": state.get("messages", []) + [("user", prompt)]
-    })
+    result = agent.invoke(
+        {"messages": messages},
+        config={"recursion_limit": 20},
+    )
     answer = _extract_ai_answer(result)
     messages = state.get("messages", []) + [
         HumanMessage(content=state.get("question", "")),
@@ -127,6 +148,20 @@ def run_agent(thread_id: str, question: str, facts: list[str], role: str | None)
         config={"configurable": {"thread_id": thread_id}},
     )
     return {
-        "answer": state.get("answer", "I could not generate an answer from the available facts."),
+        "answer": state.get("answer", "暂时无法根据现有信息生成回答。"),
         "memory_size": len(state.get("messages", [])),
     }
+
+
+def remember_exchange(thread_id: str, question: str, answer: str) -> int:
+    """Persist a deterministic exchange such as a confirmed write action."""
+    config = {"configurable": {"thread_id": thread_id}}
+    snapshot = _compiled_graph.get_state(config)
+    messages = list(snapshot.values.get("messages", []))
+    messages.extend([
+        HumanMessage(content=question),
+        AIMessage(content=answer),
+    ])
+    messages = messages[-MAX_MEMORY_MESSAGES:]
+    _compiled_graph.update_state(config, {"messages": messages})
+    return len(messages)

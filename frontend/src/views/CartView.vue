@@ -16,7 +16,7 @@
       </el-button>
     </div>
 
-    <div v-if="cart.loading" class="cart-list">
+    <div v-if="cart.loading && !cart.items.length" class="cart-list">
       <el-skeleton v-for="item in 3" :key="item" animated :rows="3" />
     </div>
 
@@ -28,7 +28,12 @@
 
     <template v-else>
       <div class="cart-list">
-        <article v-for="line in lines" :key="line.id" class="cart-item surface">
+        <article
+          v-for="line in lines"
+          :key="line.id"
+          class="cart-item surface"
+          @click="openProduct(line)"
+        >
           <div class="item-image">
             <img
               v-if="line.product?.mainImage"
@@ -47,18 +52,20 @@
                 text
                 type="danger"
                 :icon="Trash2"
-                @click="removeItem(line)"
+                @click.stop="removeItem(line)"
               />
             </div>
             <div class="item-bottom">
               <span class="price">{{ formatPrice(line.product?.price) }}</span>
-              <el-input-number
-                v-model="line.num"
-                :min="1"
-                :max="Math.max(line.product?.stock || 1, 1)"
-                size="small"
-                @change="(value) => changeNum(line, value)"
-              />
+              <div class="quantity-control" @click.stop>
+                <el-input-number
+                  v-model="line.num"
+                  :min="1"
+                  :max="Math.max(line.product?.stock || 1, 1)"
+                  size="small"
+                  @change="(value) => changeNum(line, value)"
+                />
+              </div>
             </div>
           </div>
         </article>
@@ -125,6 +132,7 @@ const router = useRouter()
 const cart = useCartStore()
 
 const productMap = ref({})
+const buyerProfile = ref(null)
 const checkoutVisible = ref(false)
 const submitting = ref(false)
 const idempotencyKey = ref('')
@@ -137,7 +145,6 @@ const checkout = reactive({
 const lines = computed(() =>
   cart.items.map((item) => ({
     ...item,
-    originalNum: item.num,
     product: productMap.value[item.productId]
   }))
 )
@@ -151,7 +158,7 @@ const totalAmount = computed(() =>
 
 async function loadCart() {
   try {
-    const items = await cart.load()
+    const items = await cart.load({ force: true })
     const entries = await Promise.all(
       (items || []).map(async (item) => {
         try {
@@ -170,6 +177,7 @@ async function loadCart() {
 async function loadProfile() {
   try {
     const profile = await profileApi.get()
+    buyerProfile.value = profile
     checkout.receiverName = profile.nickname || profile.username || ''
     checkout.receiverPhone = profile.phone || ''
     checkout.receiverAddress = profile.address || ''
@@ -178,16 +186,65 @@ async function loadProfile() {
   }
 }
 
+function isProfileIncomplete(profile) {
+  return (
+    !profile?.nickname ||
+    !profile?.phone ||
+    !profile?.email ||
+    !profile?.address
+  )
+}
+
+async function ensureProfileComplete() {
+  let profile = buyerProfile.value
+  if (!profile) {
+    try {
+      profile = await profileApi.get()
+      buyerProfile.value = profile
+    } catch (error) {
+      ElMessage.error(error.message || '个人信息加载失败')
+      return false
+    }
+  }
+  if (!isProfileIncomplete(profile)) {
+    checkout.receiverName ||= profile.nickname || profile.username || ''
+    checkout.receiverPhone ||= profile.phone || ''
+    checkout.receiverAddress ||= profile.address || ''
+    return true
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      '请先补全昵称、手机号、邮箱和收货地址后再下单。',
+      '个人信息不完整',
+      {
+        confirmButtonText: '去补全信息',
+        cancelButtonText: '暂不结算',
+        type: 'warning'
+      }
+    )
+    router.push('/profile')
+  } catch {
+    // User chose to stay on the cart page.
+  }
+  return false
+}
+
 async function changeNum(line, value) {
-  if (!value || value === line.originalNum) return
+  if (!value) return
   try {
     await cart.updateNum(line.id, value)
     idempotencyKey.value = ''
-    await loadCart()
   } catch (error) {
-    line.num = line.originalNum
     ElMessage.error(error.message || '数量修改失败')
   }
+}
+
+function openProduct(line) {
+  router.push({
+    name: 'product-detail',
+    params: { id: line.productId }
+  })
 }
 
 async function removeItem(line) {
@@ -216,7 +273,10 @@ async function clearCart() {
   }
 }
 
-function openCheckout() {
+async function openCheckout() {
+  if (!(await ensureProfileComplete())) {
+    return
+  }
   if (!idempotencyKey.value) {
     idempotencyKey.value = newIdempotencyKey()
   }
@@ -232,6 +292,9 @@ function newIdempotencyKey() {
 }
 
 async function submitOrder() {
+  if (!(await ensureProfileComplete())) {
+    return
+  }
   if (
     !checkout.receiverName ||
     !checkout.receiverPhone ||
@@ -242,14 +305,18 @@ async function submitOrder() {
   }
   submitting.value = true
   try {
-    await orderApi.create({
+    const createdOrders = await orderApi.create({
       idempotencyKey: idempotencyKey.value,
       ...checkout
     })
     idempotencyKey.value = ''
     await cart.load()
     checkoutVisible.value = false
-    ElMessage.success('订单创建成功')
+    ElMessage.success(
+      Array.isArray(createdOrders) && createdOrders.length > 1
+        ? `订单创建成功，已按卖家拆分为 ${createdOrders.length} 张订单`
+        : '订单创建成功'
+    )
     router.push({ path: '/profile', query: { status: '0' } })
   } catch (error) {
     ElMessage.error(error.message || '订单创建失败')
@@ -292,6 +359,14 @@ onMounted(() => {
   grid-template-columns: 112px 1fr;
   gap: 16px;
   padding: 14px;
+  cursor: pointer;
+  transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s;
+}
+
+.cart-item:hover {
+  border-color: rgba(232, 111, 58, 0.42);
+  box-shadow: 0 10px 26px rgba(127, 74, 42, 0.09);
+  transform: translateY(-1px);
 }
 
 .item-image {
@@ -341,6 +416,10 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.quantity-control {
+  display: flex;
 }
 
 .checkout-bar {
