@@ -93,7 +93,7 @@ services:
     volumes:
       - uploads-data:/app/uploads
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -120,7 +120,7 @@ services:
   ollama-init:
     image: ollama/ollama:latest
     container_name: ecommerce-ollama-init
-    restart: "no"
+    restart: on-failure:5
     depends_on:
       ollama:
         condition: service_healthy
@@ -138,6 +138,8 @@ services:
     build:
       context: ./ai-agent
       dockerfile: Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     container_name: ecommerce-agent
     restart: unless-stopped
     depends_on:
