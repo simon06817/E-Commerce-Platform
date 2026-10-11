@@ -19,12 +19,25 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
   cache:
     type: redis
   flyway:
     enabled: true
-    baseline-on-migrate: true
-    baseline-version: 1
+    baseline-on-migrate: false
     locations: classpath:db/migration
   servlet:
     multipart:
@@ -35,7 +48,7 @@ spring:
     date-format: yyyy-MM-dd HH:mm:ss
 
 mybatis-plus:
-  type-enums-package: com.example.project01.common
+  type-enums-package: com.ecommerce.platform.common
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
@@ -48,6 +61,8 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 app:
+  auth:
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}
   cors:
     allowed-origins: http://localhost:5173,http://localhost:3000
   security:
@@ -60,11 +75,12 @@ app:
     order-queue: e-commerce.order.queue
     order-routing-key: order.created
     order-paid-routing-key: order.paid
-  outbox:
-    scan-interval-ms: 10000
+    order-dead-letter-exchange: e-commerce.order.dlx
+    order-dead-letter-queue: e-commerce.order.dlq
+    order-dead-letter-routing-key: order.dead
   jwt:
     secret: ${JWT_SECRET}
-    access-expire-minutes: 30
+    access-expire-minutes: 15
     refresh-expire-days: 7
   order:
     expire-minutes: 30
@@ -77,17 +93,12 @@ app:
     dir: ${UPLOAD_DIR:./uploads}
     url-prefix: /uploads/
 
-aliyun:
-  ai:
-    api-key: ${ALIYUN_AI_API_KEY:}
-    model: qwen-turbo
-
 logging:
   pattern:
     correlation: "[traceId=%X{traceId:-}] "
   level:
     root: info
-    com.example.project01.mapper: warn
+    com.ecommerce.platform.mapper: warn
     org.mybatis: warn
     org.mybatis.spring: warn
     org.springframework.amqp: warn
@@ -96,16 +107,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info
   endpoint:
     health:
       show-details: always
-    prometheus:
-      enabled: true
-  prometheus:
-    metrics:
-      export:
-        enabled: true
-  metrics:
-    tags:
-      application: ${spring.application.name}

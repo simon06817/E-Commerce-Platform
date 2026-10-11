@@ -46,7 +46,8 @@ export const useAssistantStore = defineStore('assistant', () => {
             status: ''
           }
         ],
-        sending: false
+        sending: false,
+        historyLoaded: false
       }
     }
     return sessions[key]
@@ -71,6 +72,27 @@ export const useAssistantStore = defineStore('assistant', () => {
     }
   }
 
+  async function loadHistory(key) {
+    const session = ensure(key, '你好，我是暖集 AI 助手。')
+    if (session.historyLoaded || session.sending) return
+    try {
+      const data = await agentApi.history()
+      const welcome = session.messages.find(
+        (message) => message.id === `${key}-welcome`
+      )
+      const history = (data.messages || []).map((message, index) => ({
+        id: `history-${key}-${index}`,
+        role: message.role,
+        content: localizeMessage(message.content),
+        status: ''
+      }))
+      session.messages = welcome ? [welcome, ...history] : history
+      session.historyLoaded = true
+    } catch {
+      // Keep the local session usable when history cannot be loaded.
+    }
+  }
+
   async function send(key, content) {
     const session = ensure(key, '你好，我是暖集 AI 助手。')
     if (!content || session.sending) return
@@ -89,13 +111,13 @@ export const useAssistantStore = defineStore('assistant', () => {
       role: 'user',
       content
     })
-    const assistantMessage = {
+    session.messages.push({
       id: `assistant-${Date.now()}`,
       role: 'assistant',
       content: '',
       status: '正在处理…'
-    }
-    session.messages.push(assistantMessage)
+    })
+    const assistantMessage = session.messages[session.messages.length - 1]
     session.sending = true
 
     try {
@@ -124,5 +146,5 @@ export const useAssistantStore = defineStore('assistant', () => {
     }
   }
 
-  return { sessions, ensure, get, clear, clearAll, send }
+  return { sessions, ensure, get, clear, clearAll, loadHistory, send }
 })

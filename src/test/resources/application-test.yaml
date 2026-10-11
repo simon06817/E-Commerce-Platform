@@ -33,11 +33,13 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 app:
+  auth:
+    cookie-secure: false
   mq:
     enabled: false
   jwt:
     secret: ECommercePlatformJwtSecretKey2026ForInternshipProject
-    access-expire-minutes: 30
+    access-expire-minutes: 15
     refresh-expire-days: 7
   upload:
     dir: target/test-uploads

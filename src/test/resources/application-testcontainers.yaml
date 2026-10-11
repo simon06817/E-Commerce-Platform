@@ -33,15 +33,16 @@ app:
     order-queue: e-commerce.order.queue
     order-routing-key: order.created
     order-paid-routing-key: order.paid
-  outbox:
-    scan-interval-ms: 60000
+    order-dead-letter-exchange: e-commerce.order.dlx
+    order-dead-letter-queue: e-commerce.order.dlq
+    order-dead-letter-routing-key: order.dead
   order:
     expire-minutes: 30
     close-scan-interval-ms: 60000
     close-initial-delay-ms: 60000
   jwt:
     secret: ECommercePlatformJwtSecretKey2026ForInternshipProject
-    access-expire-minutes: 30
+    access-expire-minutes: 15
     refresh-expire-days: 7
   upload:
     dir: target/testcontainers-uploads

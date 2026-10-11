@@ -1,0 +1,25 @@
+package com.ecommerce.platform.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.ecommerce.platform.entity.Cart;
+
+import java.util.Collection;
+import java.util.List;
+
+/**
+ * Buyer shopping cart operations.
+ */
+public interface CartService extends IService<Cart> {
+
+    List<Cart> getCartList(Long buyerId);
+
+    void addCart(Long buyerId, Long productId, Integer num);
+
+    void updateCartNum(Long buyerId, Long cartId, Integer num);
+
+    void deleteCart(Long buyerId, Long cartId);
+
+    void clearCart(Long buyerId);
+
+    void removeSelected(Long buyerId, Collection<Long> cartIds);
+}

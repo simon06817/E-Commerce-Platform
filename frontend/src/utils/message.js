@@ -75,7 +75,6 @@ const MESSAGE_MAP = {
   'handle note cannot exceed 500 chars': '处理说明不能超过 500 个字符',
   'old password must not be blank': '原密码不能为空',
   'new password must not be blank': '新密码不能为空',
-  'refresh token must not be blank': '刷新令牌不能为空',
   'quantity must not be null': '商品数量不能为空',
   'quantity must be at least 1': '商品数量不能少于 1 件',
   'product id must not be null': '商品不能为空',

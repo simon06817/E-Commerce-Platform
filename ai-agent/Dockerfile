@@ -19,7 +19,7 @@ COPY app ./app
 COPY data ./data
 COPY scripts ./scripts
 
-RUN mkdir -p /app/data/vector
+RUN mkdir -p /app/data/vector /app/data/conversations
 
 EXPOSE 8000
 

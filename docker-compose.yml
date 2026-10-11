@@ -11,9 +11,6 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-      - ./sql/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
-      - ./sql/demo_bulk_data.sql:/docker-entrypoint-initdb.d/03-demo.sql:ro
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
@@ -85,8 +82,8 @@ services:
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       JWT_SECRET: ${JWT_SECRET:-change-this-demo-secret-to-at-least-32-characters}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       UPLOAD_DIR: /app/uploads
-      SPRING_FLYWAY_ENABLED: "false"
       TZ: Asia/Shanghai
     ports:
       - "8080:8080"
@@ -126,7 +123,7 @@ services:
         condition: service_healthy
     environment:
       OLLAMA_HOST: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:0.8b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:2b}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-quentinz/bge-small-zh-v1.5:q4_0}
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -166,14 +163,19 @@ services:
     environment:
       JAVA_API_BASE_URL: http://java:8080
       OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:0.8b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:2b}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-quentinz/bge-small-zh-v1.5:q4_0}
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost,http://127.0.0.1
+      CONVERSATION_DB_PATH: /app/data/conversations/conversation.db
+      CONVERSATION_TTL_SECONDS: ${CONVERSATION_TTL_SECONDS:-86400}
+      CONVERSATION_HISTORY_LIMIT: ${CONVERSATION_HISTORY_LIMIT:-20}
+      CONVERSATION_CLEANUP_INTERVAL_SECONDS: ${CONVERSATION_CLEANUP_INTERVAL_SECONDS:-600}
       TZ: Asia/Shanghai
     ports:
       - "8000:8000"
     volumes:
       - agent-vector-data:/app/data/vector
+      - agent-conversation-data:/app/data/conversations
     command:
       - sh
       - -c
@@ -213,4 +215,5 @@ volumes:
   rabbitmq-data:
   uploads-data:
   agent-vector-data:
+  agent-conversation-data:
   ollama-data:

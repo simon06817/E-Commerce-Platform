@@ -12,7 +12,7 @@ class Config:
 
     # 本地 Ollama 对话模型与 embedding 模型
     ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    ollama_model = os.getenv("OLLAMA_MODEL", "qwen3.5:0.8b")
+    ollama_model = os.getenv("OLLAMA_MODEL", "qwen3:2b")
     embedding_model = os.getenv("EMBEDDING_MODEL", "quentinz/bge-small-zh-v1.5:q4_0")
     # Java 电商后端地址，Agent 工具通过它调用商品/分类等接口
     java_api_base_url = os.getenv("JAVA_API_BASE_URL", "http://localhost:8080")
@@ -34,6 +34,25 @@ class Config:
     )
     # 商品同步接口的分页大小
     product_sync_page_size = int(os.getenv("PRODUCT_SYNC_PAGE_SIZE", "50"))
+    # AI 对话使用 SQLite 保存最近消息，TTL 按最后一条消息滑动计算。
+    conversation_db_path = os.getenv(
+        "CONVERSATION_DB_PATH",
+        str(
+            Path(__file__).resolve().parents[1]
+            / "data"
+            / "conversations"
+            / "conversation.db"
+        ),
+    )
+    conversation_ttl_seconds = int(
+        os.getenv("CONVERSATION_TTL_SECONDS", "86400")
+    )
+    conversation_history_limit = int(
+        os.getenv("CONVERSATION_HISTORY_LIMIT", "20")
+    )
+    conversation_cleanup_interval_seconds = int(
+        os.getenv("CONVERSATION_CLEANUP_INTERVAL_SECONDS", "600")
+    )
     # 允许直接访问 AI 服务的前端来源，多个用逗号分隔
     cors_allowed_origins = os.getenv(
         "CORS_ALLOWED_ORIGINS",

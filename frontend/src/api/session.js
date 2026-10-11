@@ -1,6 +1,8 @@
 const SESSION_KEY = 'ecommerce_session'
 const AVATAR_PREFIX = 'ecommerce_avatar_'
 
+let accessToken = ''
+
 export function getSession() {
   try {
     return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null')
@@ -10,28 +12,24 @@ export function getSession() {
 }
 
 export function saveSession(data) {
+  accessToken = data.token || ''
   const session = {
-    token: data.token,
-    refreshToken: data.refreshToken,
     userId: data.userId,
     username: data.username,
     role: data.role,
     displayName: data.displayName
   }
   localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-  return session
+  return { ...session, token: accessToken }
 }
 
 export function clearSession() {
+  accessToken = ''
   localStorage.removeItem(SESSION_KEY)
 }
 
 export function getAccessToken() {
-  return getSession()?.token || ''
-}
-
-export function getRefreshToken() {
-  return getSession()?.refreshToken || ''
+  return accessToken
 }
 
 export function getAvatarUrl(userId) {

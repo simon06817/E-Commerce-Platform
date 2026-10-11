@@ -4,9 +4,9 @@ import { getAccessToken } from './session'
 export const authApi = {
   login: (data) => unwrap(api.post('/api/auth/login', data)),
   register: (data) => unwrap(api.post('/api/auth/register', data)),
+  refresh: () => unwrap(api.post('/api/auth/refresh')),
   me: () => unwrap(api.get('/api/auth/me')),
-  logout: (refreshToken) =>
-    unwrap(api.post('/api/auth/logout', { refreshToken }))
+  logout: () => unwrap(api.post('/api/auth/logout'))
 }
 
 export const categoryApi = {
@@ -137,6 +137,17 @@ export const uploadApi = {
 }
 
 export const agentApi = {
+  history: async () => {
+    const response = await fetch('/agent/chat/history', {
+      headers: {
+        Authorization: `Bearer ${getAccessToken()}`
+      }
+    })
+    if (!response.ok) {
+      throw new Error(response.status === 401 ? '登录状态已失效，请重新登录' : '无法读取历史对话')
+    }
+    return response.json()
+  },
   chat: async (message) => {
     const response = await api.post(
       '/agent/chat',
@@ -148,6 +159,9 @@ export const agentApi = {
   streamChat: async (message, handlers = {}) => {
     const controller = new AbortController()
     const timeout = window.setTimeout(() => controller.abort(), 240000)
+    const nextPaint = () => new Promise((resolve) => {
+      window.requestAnimationFrame(resolve)
+    })
     try {
       const response = await fetch('/agent/chat/stream', {
         method: 'POST',
@@ -176,7 +190,10 @@ export const agentApi = {
           if (!line.trim()) continue
           const event = JSON.parse(line)
           if (event.type === 'status') handlers.onStatus?.(event.text)
-          if (event.type === 'delta') handlers.onDelta?.(event.text)
+          if (event.type === 'delta') {
+            handlers.onDelta?.(event.text)
+            await nextPaint()
+          }
           if (event.type === 'error') throw new Error(event.message || 'AI 服务暂不可用')
           if (event.type === 'done') finalData = event.data
         }
@@ -184,7 +201,10 @@ export const agentApi = {
       }
       if (buffer.trim()) {
         const event = JSON.parse(buffer)
-        if (event.type === 'delta') handlers.onDelta?.(event.text)
+        if (event.type === 'delta') {
+          handlers.onDelta?.(event.text)
+          await nextPaint()
+        }
         if (event.type === 'error') throw new Error(event.message || 'AI 服务暂不可用')
         if (event.type === 'done') finalData = event.data
       }

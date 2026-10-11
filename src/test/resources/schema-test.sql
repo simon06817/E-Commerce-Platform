@@ -111,18 +111,6 @@ CREATE TABLE order_item (
   create_time timestamp default current_timestamp
 );
 
-CREATE TABLE order_outbox (
-  id bigint auto_increment primary key,
-  order_id bigint not null,
-  event_type varchar(50) not null,
-  payload varchar(2000),
-  trace_id varchar(64),
-  status tinyint default 0,
-  retry_count int default 0,
-  create_time timestamp default current_timestamp,
-  update_time timestamp default current_timestamp
-);
-
 CREATE TABLE order_event_record (
   id bigint auto_increment primary key,
   order_id bigint not null,

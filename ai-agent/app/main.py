@@ -4,6 +4,7 @@ import logging
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -15,9 +16,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app import metrics
-from app.agent import remember_exchange, run_agent
+from app.agent import remember_exchange, run_agent, stream_agent
 from app.api_catalog import api_catalog_facts
 from app.config import config
+from app.conversation_store import conversation_store
 from app.rag import search_knowledge, search_products
 from app.tools import (
     begin_action_collection,
@@ -33,7 +35,32 @@ from app.web_search import perform_web_search
 
 logger = logging.getLogger("uvicorn.error")
 
-app = FastAPI(title="E-Commerce AI Agent")
+
+async def _cleanup_conversations_periodically() -> None:
+    while True:
+        await asyncio.sleep(config.conversation_cleanup_interval_seconds)
+        try:
+            deleted = await asyncio.to_thread(conversation_store.cleanup_expired)
+            if deleted:
+                metrics.increment("agent.conversations.cleanup_deleted", deleted)
+                logger.info("expired conversations removed: %s messages", deleted)
+        except Exception:
+            logger.exception("conversation cleanup failed")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    conversation_store.initialize()
+    cleanup_task = asyncio.create_task(_cleanup_conversations_periodically())
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
+
+
+app = FastAPI(title="E-Commerce AI Agent", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.cors_origins,
@@ -45,7 +72,6 @@ app.add_middleware(
 
 # 每个用户一个进程内待确认动作队列，服务重启后清空。
 _pending_actions: dict[str, dict[str, Any]] = {}
-_memory_sizes: dict[str, int] = {}
 
 _CONFIRM_WORDS = {"确认", "确定", "是", "好的", "好", "yes", "y", "ok"}
 _CANCEL_WORDS = {"取消", "不用了", "不要了", "no", "n"}
@@ -64,6 +90,18 @@ _CN_NUMBERS = {
     "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
 }
 _CATEGORY_NAMES = ("电子产品", "图书", "服装", "玩具", "食品")
+_CATEGORY_ALIASES = {
+    "零食": "食品",
+    "吃的": "食品",
+    "手机": "电子产品",
+    "数码": "电子产品",
+    "电子": "电子产品",
+    "电脑": "电子产品",
+    "衣服": "服装",
+    "服饰": "服装",
+    "书籍": "图书",
+    "玩具": "玩具",
+}
 _ACCOUNT_QUERY_KEYWORDS = (
     "订单", "购物车", "退货", "退款", "通知", "统计", "收入",
     "发货", "商品管理", "我的商品", "库存", "上架", "下架",
@@ -510,21 +548,42 @@ def _is_recommendation_question(question: str) -> bool:
     if "推荐" not in question:
         return False
     return (
-        any(category in question for category in _CATEGORY_NAMES)
+        _recommendation_scope(question) is not None
         or ("销量" in question and "评价" in question)
     )
 
 
+def _recommendation_scope(question: str) -> str | None:
+    for alias in sorted(_CATEGORY_ALIASES, key=len, reverse=True):
+        if alias in question:
+            return alias
+    return next(
+        (category for category in _CATEGORY_NAMES if category in question),
+        None,
+    )
+
+
+def _recommendation_category_name(question: str) -> str | None:
+    scope = _recommendation_scope(question)
+    if scope in _CATEGORY_ALIASES:
+        return _CATEGORY_ALIASES[scope]
+    return scope
+
+
 def _recommendation_category_id(question: str) -> int | None:
+    category_name = _recommendation_category_name(question)
+    if category_name is None:
+        return None
     categories = _java_get("/api/categories") or []
     for category in categories:
-        name = category.get("name")
-        if name and name in question:
+        if category.get("name") == category_name:
             return category.get("id")
     return None
 
 
-def _recommendation_answer(question: str) -> tuple[str, list[dict[str, Any]]]:
+def _recommendation_chunks(
+    question: str,
+) -> tuple[list[str], list[dict[str, Any]]]:
     category_id = _recommendation_category_id(question)
     params = {"limit": 5}
     if category_id is not None:
@@ -533,17 +592,14 @@ def _recommendation_answer(question: str) -> tuple[str, list[dict[str, Any]]]:
         "/api/products/recommendations?" + urlencode(params)
     ) or []
     if not recommendations:
-        return "当前没有符合条件的在售商品可以推荐。", []
+        return ["当前没有符合条件的在售商品可以推荐。"], []
 
     has_metric_data = any(
         int(item.get("salesQuantity") or 0) > 0
         or int(item.get("reviewCount") or 0) > 0
         for item in recommendations
     )
-    scope = next(
-        (name for name in _CATEGORY_NAMES if name in question),
-        "商品",
-    )
+    scope = _recommendation_scope(question) or "商品"
     lines = []
     if has_metric_data:
         lines.append(f"根据真实付款销量和评价表现，为您推荐这些{scope}：")
@@ -569,7 +625,12 @@ def _recommendation_answer(question: str) -> tuple[str, list[dict[str, Any]]]:
             "product_id": item.get("id"),
             "name": item.get("name"),
         })
-    return "\n".join(lines), products
+    return lines, products
+
+
+def _recommendation_answer(question: str) -> tuple[str, list[dict[str, Any]]]:
+    chunks, products = _recommendation_chunks(question)
+    return "\n".join(chunks), products
 
 
 def _is_admin_read_question(question: str) -> bool:
@@ -840,6 +901,9 @@ def health():
             dependencies[name] = "down"
 
     dependencies["chroma"] = "up" if Path(config.vector_dir).is_dir() else "down"
+    dependencies["conversation_store"] = (
+        "up" if conversation_store.is_healthy() else "down"
+    )
     status = "ok" if all(value == "up" for value in dependencies.values()) else "degraded"
     return {"status": status, "dependencies": dependencies}
 
@@ -847,7 +911,24 @@ def health():
 @app.get("/metrics")
 def metrics_snapshot():
     """Expose lightweight in-process Agent counters and latency summaries."""
-    return metrics.snapshot()
+    snapshot = metrics.snapshot()
+    snapshot["gauges"] = {
+        "agent.conversations.active": conversation_store.active_conversation_count(),
+    }
+    return snapshot
+
+
+@app.get("/chat/history")
+def chat_history(authorization: str | None = Header(default=None)):
+    """Return the current user's unexpired SQLite conversation history."""
+    user = _current_user(authorization)
+    thread_id = f"{user.get('role')}:{user.get('id')}"
+    return {
+        "messages": conversation_store.recent_messages(
+            thread_id,
+            limit=config.conversation_history_limit,
+        )
+    }
 
 
 @app.post("/chat")
@@ -858,7 +939,12 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
         return await asyncio.to_thread(_handle_chat, request, authorization)
 
 
-def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
+def _handle_chat(
+    request: ChatRequest,
+    authorization: str | None,
+    *,
+    defer_llm: bool = False,
+) -> dict:
     """校验用户、处理待确认操作、先检索真实信息，再调用 LangGraph。"""
     user = _current_user(authorization)
     thread_id = f"{user.get('role')}:{user.get('id')}"
@@ -871,7 +957,6 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
             metrics.increment("agent.actions.cancelled")
             answer = "已取消该操作。"
             memory_size = remember_exchange(thread_id, question, answer)
-            _memory_sizes[thread_id] = memory_size
             return _response(answer, user, [], memory_size)
         if not _is_confirm(question):
             # A new request supersedes an unresolved confirmation. This avoids
@@ -901,17 +986,18 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
             finally:
                 reset_user_token(token_ctx)
             memory_size = remember_exchange(thread_id, question, answer)
-            _memory_sizes[thread_id] = memory_size
             return _response(answer, user, [], memory_size)
 
     if _is_identity_question(question):
         try:
             profile = _java_get("/api/profile", authorization)
+            answer = _identity_answer(profile or {}, user.get("role"))
+            memory_size = remember_exchange(thread_id, question, answer)
             return _response(
-                _identity_answer(profile or {}, user.get("role")),
+                answer,
                 user,
                 [],
-                _memory_sizes.get(thread_id, 0),
+                memory_size,
             )
         except Exception:
             logger.exception("identity profile lookup failed")
@@ -922,7 +1008,6 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
             _set_pending_actions(thread_id, [admin_action])
             answer = _confirmation_text(admin_action)
             memory_size = remember_exchange(thread_id, question, answer)
-            _memory_sizes[thread_id] = memory_size
             return _response(answer, user, [], memory_size, True)
 
         try:
@@ -930,7 +1015,6 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
             if admin_answer:
                 answer, products = admin_answer
                 memory_size = remember_exchange(thread_id, question, answer)
-                _memory_sizes[thread_id] = memory_size
                 return _response(answer, user, products, memory_size)
         except Exception:
             logger.exception("admin deterministic lookup failed")
@@ -939,17 +1023,19 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
         try:
             answer, products = _cart_count_answer(authorization)
             memory_size = remember_exchange(thread_id, question, answer)
-            _memory_sizes[thread_id] = memory_size
             return _response(answer, user, products, memory_size)
         except Exception:
             logger.exception("cart count lookup failed")
 
     if _is_recommendation_question(question):
         try:
-            answer, products = _recommendation_answer(question)
+            chunks, products = _recommendation_chunks(question)
+            answer = "\n".join(chunks)
             memory_size = remember_exchange(thread_id, question, answer)
-            _memory_sizes[thread_id] = memory_size
-            return _response(answer, user, products, memory_size)
+            response = _response(answer, user, products, memory_size)
+            if defer_llm:
+                response["_stream_chunks"] = chunks
+            return response
         except Exception:
             logger.exception("recommendation lookup failed")
 
@@ -969,7 +1055,6 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
             _set_pending_actions(thread_id, [action])
             answer = _confirmation_text(action)
             memory_size = remember_exchange(thread_id, question, answer)
-            _memory_sizes[thread_id] = memory_size
             products = [{
                 "product_id": cart_product["product_id"],
                 "name": cart_product.get("name"),
@@ -981,6 +1066,18 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
     except Exception:
         logger.exception("agent fact retrieval failed")
         facts, products = [], []
+
+    if defer_llm:
+        return {
+            "_llm_context": {
+                "user": user,
+                "thread_id": thread_id,
+                "question": question,
+                "facts": facts,
+                "products": products,
+                "authorization": authorization,
+            }
+        }
 
     token_ctx = set_user_token(authorization)
     role_ctx = set_user_role(user.get("role"))
@@ -995,7 +1092,7 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
     except Exception:
         metrics.increment("agent.llm.failures")
         logger.exception("agent execution failed for thread %s", thread_id)
-        memory_size = _memory_sizes.get(thread_id, 0)
+        memory_size = conversation_store.memory_size(thread_id)
         return _response(
             "AI 助手暂时无法完成这次请求，请稍后重试。",
             user,
@@ -1008,8 +1105,6 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
         reset_user_token(token_ctx)
 
     _normalize_actions(question, actions)
-    memory_size = int(result.get("memory_size", 0))
-    _memory_sizes[thread_id] = memory_size
     if actions:
         _set_pending_actions(thread_id, actions)
         metrics.increment("agent.actions.proposed")
@@ -1017,6 +1112,7 @@ def _handle_chat(request: ChatRequest, authorization: str | None) -> dict:
     else:
         answer = result.get("answer", "AI 助手暂时无法生成回答")
 
+    memory_size = remember_exchange(thread_id, question, answer)
     return _response(answer, user, products, memory_size, bool(actions))
 
 
@@ -1029,14 +1125,21 @@ async def _chat_event_stream(request: ChatRequest, authorization: str | None):
     request_started = time.perf_counter()
     yield _stream_line({"type": "status", "text": "正在读取账户和商品数据…"})
     try:
-        result = await asyncio.to_thread(_handle_chat, request, authorization)
+        prepared = await asyncio.to_thread(
+            _handle_chat,
+            request,
+            authorization,
+            defer_llm=True,
+        )
     except HTTPException as exc:
+        metrics.increment("agent.stream.failures")
         yield _stream_line({
             "type": "error",
             "message": str(exc.detail),
         })
         return
     except Exception:
+        metrics.increment("agent.stream.failures")
         logger.exception("streaming agent execution failed")
         yield _stream_line({
             "type": "error",
@@ -1044,10 +1147,81 @@ async def _chat_event_stream(request: ChatRequest, authorization: str | None):
         })
         return
 
-    answer = result.get("answer", "")
-    for start in range(0, len(answer), 4):
-        yield _stream_line({"type": "delta", "text": answer[start:start + 4]})
-        await asyncio.sleep(0.012)
+    llm_context = prepared.get("_llm_context")
+    if llm_context is None:
+        answer = prepared.get("answer", "")
+        chunks = prepared.pop("_stream_chunks", None)
+        if chunks:
+            for index, chunk in enumerate(chunks):
+                yield _stream_line({"type": "delta", "text": chunk})
+                if index < len(chunks) - 1:
+                    await asyncio.sleep(0.12)
+        elif answer:
+            yield _stream_line({"type": "delta", "text": answer})
+        yield _stream_line({"type": "done", "data": prepared})
+        metrics.observe_ms(
+            "agent.request_ms",
+            (time.perf_counter() - request_started) * 1000,
+        )
+        return
+
+    user = llm_context["user"]
+    thread_id = llm_context["thread_id"]
+    question = llm_context["question"]
+    facts = llm_context["facts"]
+    products = llm_context["products"]
+    token_ctx = set_user_token(llm_context["authorization"])
+    role_ctx = set_user_role(user.get("role"))
+    action_ctx = begin_action_collection()
+    answer_parts: list[str] = []
+    actions: list[dict[str, Any]] = []
+    try:
+        yield _stream_line({"type": "status", "text": "正在生成回答…"})
+        metrics.increment("agent.llm.calls")
+        with metrics.timer("agent.llm_ms"):
+            async for chunk in stream_agent(
+                thread_id,
+                question,
+                facts,
+                user.get("role"),
+            ):
+                if proposed_actions():
+                    continue
+                answer_parts.append(chunk)
+                yield _stream_line({"type": "delta", "text": chunk})
+            actions = proposed_actions()
+    except Exception:
+        metrics.increment("agent.llm.failures")
+        metrics.increment("agent.stream.failures")
+        logger.exception("streaming agent execution failed for thread %s", thread_id)
+        yield _stream_line({
+            "type": "error",
+            "message": "AI 助手暂时无法完成这次请求，请稍后重试。",
+        })
+        return
+    finally:
+        end_action_collection(action_ctx)
+        reset_user_role(role_ctx)
+        reset_user_token(token_ctx)
+
+    _normalize_actions(question, actions)
+    if actions:
+        _set_pending_actions(thread_id, actions)
+        metrics.increment("agent.actions.proposed")
+        answer = _confirmation_text(actions[0])
+    else:
+        answer = "".join(answer_parts).strip()
+        if not answer:
+            answer = "暂时无法根据现有信息生成回答。"
+
+    memory_size = remember_exchange(thread_id, question, answer)
+    result = _response(
+        answer,
+        user,
+        products,
+        memory_size,
+        bool(actions),
+    )
     yield _stream_line({"type": "done", "data": result})
     metrics.observe_ms(
         "agent.request_ms",

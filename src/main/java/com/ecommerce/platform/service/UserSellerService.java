@@ -1,0 +1,17 @@
+package com.ecommerce.platform.service;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.ecommerce.platform.entity.UserSeller;
+
+/**
+ * Seller account queries and pagination.
+ */
+public interface UserSellerService extends IService<UserSeller> {
+
+    UserSeller getByUsername(String username);
+
+    boolean existsByUsername(String username);
+
+    Page<UserSeller> pageWithKeyword(int current, int size, String keyword);
+}

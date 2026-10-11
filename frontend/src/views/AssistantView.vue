@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Bot, Send, UserRound } from 'lucide-vue-next'
 import BuyerLayout from '../components/BuyerLayout.vue'
@@ -99,6 +99,10 @@ const sending = computed(
   () => assistant.get(conversationKey.value)?.sending || false
 )
 assistant.ensure(conversationKey.value, '你好，我是暖集 AI 助手。')
+onMounted(async () => {
+  await assistant.loadHistory(conversationKey.value)
+  scrollToBottom()
+})
 
 function scrollToBottom() {
   nextTick(() => {

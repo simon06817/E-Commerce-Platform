@@ -15,14 +15,13 @@ export const useAuthStore = defineStore('auth', () => {
   const session = ref(getSession())
 
   const token = computed(() => session.value?.token || '')
-  const refreshToken = computed(() => session.value?.refreshToken || '')
   const userId = computed(() => session.value?.userId || null)
   const role = computed(() => session.value?.role || '')
   const username = computed(() => session.value?.username || '')
   const displayName = computed(
     () => session.value?.displayName || session.value?.username || '用户'
   )
-  const isLoggedIn = computed(() => Boolean(token.value))
+  const isLoggedIn = computed(() => Boolean(session.value?.userId))
   const avatarUrl = computed(() => getAvatarUrl(userId.value))
   const defaultRoute = computed(() => roleHome(role.value))
 
@@ -44,11 +43,25 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      await authApi.logout(refreshToken.value)
+      await authApi.logout()
     } finally {
       clearSession()
       session.value = null
       useAssistantStore().clearAll()
+    }
+  }
+
+  async function restore() {
+    if (!getSession() || token.value) {
+      return isLoggedIn.value
+    }
+    try {
+      applySession(await authApi.refresh())
+      return true
+    } catch {
+      clearSession()
+      session.value = null
+      return false
     }
   }
 
@@ -67,7 +80,6 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     session,
     token,
-    refreshToken,
     userId,
     role,
     username,
@@ -77,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
     defaultRoute,
     login,
     register,
+    restore,
     logout,
     setAvatar,
     updateDisplayName

@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Bot, Send, UserRound } from 'lucide-vue-next'
 import { useAssistantStore } from '../stores/assistant'
@@ -111,6 +111,10 @@ assistant.ensure(
   conversationKey.value,
   '你好，我可以协助你查询订单、账号和分类，并处理管理操作。'
 )
+onMounted(async () => {
+  await assistant.loadHistory(conversationKey.value)
+  scrollToBottom()
+})
 
 const suggestions = [
   '查看最近的待付款订单',

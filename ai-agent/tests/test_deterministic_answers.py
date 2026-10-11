@@ -6,6 +6,8 @@ from app.main import (
     _is_cart_count_question,
     _is_recommendation_question,
     _recommendation_answer,
+    _recommendation_category_name,
+    _recommendation_chunks,
 )
 
 
@@ -39,6 +41,10 @@ class DeterministicAnswerTest(unittest.TestCase):
             _is_recommendation_question("这款手机多少钱")
         )
 
+    def test_snack_recommendation_maps_to_food_category(self):
+        self.assertTrue(_is_recommendation_question("推荐零食"))
+        self.assertEqual("食品", _recommendation_category_name("推荐零食"))
+
     def test_recommendation_is_formatted_from_real_metrics(self):
         def fake_java_get(path, token=None):
             if path == "/api/categories":
@@ -64,6 +70,29 @@ class DeterministicAnswerTest(unittest.TestCase):
         self.assertIn("销量 12 件", answer)
         self.assertIn("4.7/5", answer)
         self.assertEqual([8], [item["product_id"] for item in products])
+
+    def test_recommendation_keeps_structured_lines_for_streaming(self):
+        def fake_java_get(path, token=None):
+            if path == "/api/categories":
+                return [{"id": 1, "name": "电子产品"}]
+            return [
+                {
+                    "id": 8,
+                    "name": "机械键盘",
+                    "price": 399,
+                    "salesQuantity": 12,
+                    "reviewCount": 3,
+                    "averageRating": 4.7,
+                    "sellerName": "Tech Store",
+                }
+            ]
+
+        with patch("app.main._java_get", side_effect=fake_java_get):
+            chunks, _products = _recommendation_chunks("推荐电子产品")
+
+        self.assertEqual(2, len(chunks))
+        self.assertIn("为您推荐", chunks[0])
+        self.assertIn("机械键盘", chunks[1])
 
 
 if __name__ == "__main__":

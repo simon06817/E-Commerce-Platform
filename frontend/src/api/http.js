@@ -2,7 +2,7 @@ import axios from 'axios'
 import {
   clearSession,
   getAccessToken,
-  getRefreshToken,
+  getSession,
   saveSession
 } from './session'
 import { localizeMessage } from '../utils/message'
@@ -37,17 +37,16 @@ api.interceptors.response.use(
 
     const original = error.config
     const status = error.response?.status
-    const refreshToken = getRefreshToken()
     const isAuthEndpoint = original?.url?.startsWith('/api/auth/')
 
-    if (status !== 401 || original?._retry || isAuthEndpoint || !refreshToken) {
+    if (status !== 401 || original?._retry || isAuthEndpoint || !getSession()) {
       return Promise.reject(error)
     }
 
     original._retry = true
     try {
       refreshTask ||= axios
-        .post('/api/auth/refresh', { refreshToken })
+        .post('/api/auth/refresh')
         .then((response) => {
           const body = response.data
           if (body.code !== 200) {

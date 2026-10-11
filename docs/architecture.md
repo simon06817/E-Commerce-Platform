@@ -10,6 +10,7 @@ flowchart LR
     AGENT --> CHROMA[("Chroma")]
     AGENT --> OLLAMA[("Ollama")]
     AGENT --> TAVILY[("Tavily")]
+    AGENT --> SQLITE[("SQLite conversation store")]
     JAVA --> MYSQL[("MySQL")]
     JAVA --> REDIS[("Redis")]
     JAVA --> MQ[("RabbitMQ")]
@@ -22,8 +23,12 @@ database access. The Agent never connects to MySQL directly.
 
 - `ADMIN`, `BUYER`, and `SELLER` use separate account tables.
 - Login requires role, username and password.
-- Access tokens are short-lived and refresh tokens are stored and rotated in Redis.
-- Logout deletes the refresh token and blacklists the access-token JTI.
+- Access tokens are stateless JWTs with a 15-minute lifetime.
+- Refresh tokens are opaque values delivered in an HttpOnly cookie and stored
+  as SHA-256 hashes in Redis.
+- Refresh operations atomically consume and rotate the token.
+- Logout revokes the refresh token and clears its cookie without maintaining
+  an access-token blacklist.
 - Service methods and controllers enforce ownership and role boundaries.
 
 ## 3. Order Model
@@ -36,12 +41,12 @@ sequenceDiagram
     participant B as Buyer
     participant API as Java API
     participant DB as MySQL
-    participant MQ as Outbox + RabbitMQ
+    participant MQ as RabbitMQ
     B->>API: POST /api/orders
     API->>DB: validate cart and group lines by seller
     API->>DB: insert one order per seller
     API->>DB: atomic stock update and item snapshots
-    API->>MQ: write ORDER_CREATED outbox records
+    API->>MQ: publish ORDER_CREATED after commit
     API->>DB: remove checked cart lines
     API-->>B: list of independent seller orders
 ```
@@ -81,10 +86,10 @@ WHERE id = ?
 The conditional update is the final concurrency guard. An early stock check may
 return a clear business error, but correctness does not depend on that check.
 
-## 5. Outbox and Idempotent Consumption
+## 5. Event Delivery and Idempotent Consumption
 
-- `order_info`, `order_item` and the outbox record are written in one transaction.
-- A scheduled publisher sends pending outbox events to RabbitMQ.
+- `order_info` and `order_item` are committed before event publication.
+- A transactional event listener publishes the order event to RabbitMQ after commit.
 - `order_event_record` has a unique key on `(order_id, event_type)`.
 - Notification creation is idempotent, so redelivery does not duplicate events.
 
@@ -114,6 +119,7 @@ Knowledge and execution are separated:
 - Tavily is used only for external or real-time information.
 - External search results are untrusted reference material.
 - Database host, port, username, password and JDBC URL are never exposed to the model.
+- Conversation history uses a SQLite sliding TTL and can be restored after restarts.
 
 Write actions use two-phase confirmation. The model proposes an action, the user
 replies `确认`, and only then does Agent call the Java write endpoint.
@@ -123,24 +129,14 @@ replies `确认`, and only then does Agent call the Java write endpoint.
 Reliability protections are verified at both unit and infrastructure level:
 
 - A checkout that fails after an earlier seller order was created rolls back
-  order rows, stock deductions, cart removal and outbox records together.
+  order rows, stock deductions and cart removal together.
 - Repeating a payment transition throws a business error and creates only one
   `ORDER_PAID` event.
 - RabbitMQ redelivery is idempotent. The inbox record and notification writes
   run in one transaction, so a failure cannot leave a consumed record without
   the corresponding notification.
 
-Micrometer exports low-cardinality business metrics through
-`/actuator/prometheus`:
-
-- checkout success and rejected requests
-- order transition outcomes by action
-- stock decrease and increase outcomes
-- product cache hit, miss and negative-cache hit results
-- outbox publish outcomes, pending count and oldest pending age
-- MQ new, duplicate and failed event outcomes
-
-`X-Trace-Id` is stored on outbox messages and copied to inbox records. The
+`X-Trace-Id` is stored on event messages and copied to inbox records. The
 RabbitMQ listener restores it into MDC before processing, so HTTP and async
 worker logs share one correlation id. Database credentials are never included
 in trace data or Agent context.
@@ -240,6 +236,7 @@ indexes tied to real query paths instead of indexing every column.
 - Concurrency tests cover the last-stock race and duplicate shipping attempts.
 - Reliability tests cover checkout rollback, duplicate payment and duplicate
   RabbitMQ delivery.
-- Observability tests assert Prometheus business metrics and trace propagation.
+- Agent tests cover deterministic routing, SQLite TTL, history restoration and
+  streaming chunk handling.
 - Agent tests cover intent routing, permissions, confirmation, RAG and Tavily
   response handling.
