@@ -7,14 +7,13 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * In-memory cache manager used when Redis caching is disabled (for example in tests).
- */
+/** 本地缓存配置。 */
 @Configuration
 @EnableCaching
 @ConditionalOnProperty(name = "spring.cache.type", havingValue = "simple")
 public class LocalCacheConfig {
 
+    /** 创建缓存管理器。 */
     @Bean
     public CacheManager cacheManager() {
         return new ConcurrentMapCacheManager();

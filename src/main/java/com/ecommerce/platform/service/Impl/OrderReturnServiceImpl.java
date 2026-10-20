@@ -23,10 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-/**
- * Return service. Approval performs a mock refund and restores stock because
- * the project has no real payment gateway.
- */
+/** 退款服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, OrderReturn>
@@ -38,6 +35,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
     private final OrderService orderService;
     private final ProductService productService;
 
+    /** 提交退款申请。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReturnVO applyReturn(Long buyerId, ReturnApplyRequest request) {
@@ -80,6 +78,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
         return toVO(orderReturn);
     }
 
+    /** 分页查询买家退款申请。 */
     @Override
     public Page<ReturnVO> getBuyerReturns(Long buyerId, int current, int size) {
         Page<OrderReturn> page = lambdaQuery()
@@ -89,6 +88,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
         return toVOPage(page);
     }
 
+    /** 撤销退款申请。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancelReturn(Long buyerId, Long returnId) {
@@ -101,6 +101,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
         updateById(orderReturn);
     }
 
+    /** 分页查询卖家退款申请。 */
     @Override
     public Page<ReturnVO> getSellerReturns(Long sellerId, int current, int size) {
         Page<OrderReturn> page = lambdaQuery()
@@ -110,21 +111,25 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
         return toVOPage(page);
     }
 
+    /** 同意退款申请并恢复库存。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void approveReturn(Long sellerId, Long returnId, String note) {
         OrderReturn orderReturn = getOwnedReturn(null, sellerId, returnId, false);
+        // 只有待处理的退款申请可以审批。
         if (orderReturn.getStatus() != ReturnStatusEnum.APPLIED.getCode()) {
             throw new BusinessException("只有待处理的退款申请可以同意");
         }
+        // 更新退款状态和处理信息。
         orderReturn.setStatus(ReturnStatusEnum.APPROVED.getCode());
         orderReturn.setHandleNote(note);
         orderReturn.setHandleTime(LocalDateTime.now());
         updateById(orderReturn);
-        // Mock refund: restore stock immediately.
+        // 模拟退款：立即恢复库存。
         productService.increaseStock(orderReturn.getProductId(), orderReturn.getQuantity());
     }
 
+    /** 拒绝退款申请。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void rejectReturn(Long sellerId, Long returnId, String note) {
@@ -138,6 +143,7 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
         updateById(orderReturn);
     }
 
+    /** 查询并校验退款申请归属。 */
     private OrderReturn getOwnedReturn(Long buyerId, Long sellerId, Long returnId, boolean buyerSide) {
         OrderReturn orderReturn = getById(returnId);
         if (orderReturn == null) {
@@ -152,12 +158,14 @@ public class OrderReturnServiceImpl extends ServiceImpl<OrderReturnMapper, Order
         return orderReturn;
     }
 
+    /** 转换分页返回对象。 */
     private Page<ReturnVO> toVOPage(Page<OrderReturn> page) {
         Page<ReturnVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
         result.setRecords(page.getRecords().stream().map(this::toVO).toList());
         return result;
     }
 
+    /** 转换业务返回对象。 */
     private ReturnVO toVO(OrderReturn orderReturn) {
         ReturnVO vo = new ReturnVO();
         vo.setId(orderReturn.getId());

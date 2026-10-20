@@ -229,8 +229,10 @@ indexes tied to real query paths instead of indexing every column.
 
 ## 9. Testing Strategy
 
-- H2 + MockMvc tests cover normal business flows and permissions.
-- Testcontainers starts real MySQL, Redis and RabbitMQ for infrastructure tests.
+- H2 + MockMvc tests cover normal business flows and permissions using a
+  test-specific Flyway migration location.
+- Testcontainers runs the production Flyway migrations on real MySQL and starts
+  Redis and RabbitMQ for infrastructure tests.
 - Order tests cover idempotency, stock restoration, split orders, seller shipping
   and buyer receipt confirmation.
 - Concurrency tests cover the last-stock race and duplicate shipping attempts.

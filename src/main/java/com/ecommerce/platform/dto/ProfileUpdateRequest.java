@@ -4,9 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * Editable profile fields for buyers and sellers.
- */
+/** 用户资料修改请求对象。 */
 @Data
 public class ProfileUpdateRequest {
 

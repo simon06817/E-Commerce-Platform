@@ -3,9 +3,7 @@ package com.ecommerce.platform.vo;
 import com.ecommerce.platform.common.AuthRole;
 import lombok.Data;
 
-/**
- * Current user profile without password data.
- */
+/** 用户资料返回对象。 */
 @Data
 public class ProfileVO {
 

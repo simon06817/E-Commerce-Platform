@@ -5,9 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-/**
- * Seller revenue statistics for a selected time range.
- */
+/** 卖家统计返回对象。 */
 @Data
 @AllArgsConstructor
 public class SellerStatsVO {

@@ -4,9 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * Password change payload requiring the current password.
- */
+/** 修改密码请求对象。 */
 @Data
 public class PasswordChangeRequest {
 

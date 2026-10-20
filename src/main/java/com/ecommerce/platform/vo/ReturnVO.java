@@ -5,9 +5,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * Return request view object with product and order snapshot information.
- */
+/** 退款返回对象。 */
 @Data
 public class ReturnVO {
 

@@ -37,10 +37,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/**
- * Product service with bloom-filter penetration protection, single-flight cache
- * rebuild and atomic stock updates.
- */
+/** 商品服务实现。 */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -52,6 +49,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     private final CacheSupport cacheSupport;
     private final UserSellerService userSellerService;
 
+    /** 分页查询商品。 */
     @Override
     public Page<Product> getProductPage(int current, int size, Long categoryId, String keyword,
                                         String shopName, Integer status) {
@@ -88,10 +86,11 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return result;
     }
 
+    /** 根据主键查询商品。 */
     @Override
     public Product getProductById(Long id) {
-        // Bloom filter rejects ids that cannot exist, then read-through cache
-        // protects the database from hot-key rebuilds.
+        // 布隆过滤器先排除不存在的 ID，再走缓存。
+        // 避免热点键失效后大量请求直接查库。
         if (!bloomFilter.mightContain(id)) {
             return null;
         }
@@ -102,6 +101,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 () -> getById(id));
     }
 
+    /** 分页查询卖家商品。 */
     @Override
     public Page<Product> getSellerProductPage(Long sellerId, int current, int size,
                                               Long categoryId, String keyword, Integer status) {
@@ -126,6 +126,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return result;
     }
 
+    /** 查询商品详情。 */
     @Override
     public Product getProductDetail(Long id) {
         Product product = getProductById(id);
@@ -135,15 +136,17 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return product;
     }
 
+    /** 查询商品推荐列表。 */
     @Override
     public List<ProductRecommendationVO> getRecommendations(Long categoryId, int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 20));
         return baseMapper.selectRecommendations(categoryId, safeLimit);
     }
 
+    /** 根据关键词解析唯一卖家。 */
     private Long resolveSellerId(String keyword) {
-        // Exact match takes precedence so a complete shop name always behaves
-        // deterministically and never mixes products from multiple sellers.
+        // 完整店铺名优先精确匹配，避免混入其他卖家商品。
+        // 精确匹配结果唯一且稳定。
         List<UserSeller> exactMatches = userSellerService.lambdaQuery()
                 .select(UserSeller::getId)
                 .apply("LOWER(shop_name) = LOWER({0})", keyword)
@@ -155,7 +158,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             return null;
         }
 
-        // Prefix matching is allowed only when it resolves to one seller.
+        // 前缀匹配仅在唯一命中一个卖家时生效。
         List<UserSeller> prefixMatches = userSellerService.lambdaQuery()
                 .select(UserSeller::getId)
                 .apply("LOWER(shop_name) LIKE CONCAT(LOWER({0}), '%')", keyword)
@@ -167,9 +170,9 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             return null;
         }
 
-        // Users commonly type Shop 07 as shop7. Keep the indexed exact/prefix
-        // checks above as the fast path, then fall back to a normalized match
-        // that ignores spaces, separators and leading zeros in numeric suffixes.
+        // 用户常把 Shop 07 写成 shop7，先走索引精确或前缀匹配。
+        // 未命中时再使用忽略空格、分隔符和前导零的兼容匹配。
+        // 兼容 Shop 07 与 shop7 等写法。
         String normalizedKeyword = normalizeShopName(keyword);
         List<Long> normalizedMatches = userSellerService.lambdaQuery()
                 .select(UserSeller::getId, UserSeller::getShopName)
@@ -182,6 +185,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return normalizedMatches.size() == 1 ? normalizedMatches.get(0) : null;
     }
 
+    /** 规范化店铺名称。 */
     private String normalizeShopName(String shopName) {
         if (!StringUtils.hasText(shopName)) {
             return "";
@@ -196,6 +200,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         return matcher.group(1) + number;
     }
 
+    /** 补充商品所属店铺名称。 */
     private void enrichSellerNames(List<Product> products) {
         if (products == null || products.isEmpty()) {
             return;
@@ -221,6 +226,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         }
     }
 
+    /** 创建商品。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createProduct(Long sellerId, ProductRequest request) {
@@ -239,6 +245,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         bloomFilter.add(product.getId());
     }
 
+    /** 修改商品。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#id")
@@ -263,6 +270,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         updateById(product);
     }
 
+    /** 修改商品上下架状态。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#id")
@@ -280,6 +288,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         updateById(update);
     }
 
+    /** 删除商品。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#id")
@@ -294,6 +303,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         removeById(id);
     }
 
+    /** 扣减商品库存。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void decreaseStock(Long productId, Integer quantity) {
@@ -304,6 +314,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         decreaseStock(product, quantity);
     }
 
+    /** 扣减商品库存。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.PRODUCT_DETAIL, key = "#product.id")
@@ -311,8 +322,8 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         if (product == null || product.getId() == null) {
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
         }
-        // Early check gives a clear business error; the conditional UPDATE below
-        // is still the concurrency-safe guard.
+        // 前置检查用于返回明确业务错误，最终并发安全仍由条件更新保证。
+        // 条件更新仍是并发安全的最终保障。
         if (product.getStock() < quantity) {
             throw new BusinessException(ResultCode.STOCK_INSUFFICIENT);
         }
@@ -330,10 +341,11 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         refreshProductCacheAfterCommit(product.getId(), product, newStock);
     }
 
+    /** 增加商品库存。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void increaseStock(Long productId, Integer quantity) {
-        // Used when an unpaid order is cancelled or times out.
+        // 待付款订单取消或超时关单时恢复库存。
         Product product = getById(productId);
         if (product == null) {
             throw new BusinessException(ResultCode.PRODUCT_NOT_EXIST);
@@ -347,13 +359,15 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         refreshProductCacheAfterCommit(productId, product, product.getStock() + quantity);
     }
 
+    /** 事务提交后刷新商品缓存。 */
     private void refreshProductCacheAfterCommit(Long productId, Product product, int newStock) {
-        // Cache refresh happens after commit so a rolled-back transaction never
-        // leaves a misleading stock value in Redis.
+        // 缓存刷新放在事务提交后，避免回滚事务写入错误库存。
+        // 防止 Redis 留下与数据库不一致的库存。
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            /** 事务提交后刷新商品缓存。 */
             @Override
             public void afterCommit() {
                 try {

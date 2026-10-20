@@ -16,10 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Seller-owned product queries. Product mutations remain under /api/products
- * and are ownership-checked by ProductService.
- */
+/** 卖家商品接口。 */
 @Tag(name = "Seller products", description = "seller-owned product management")
 @RestController
 @RequestMapping("/api/seller/products")
@@ -30,6 +27,7 @@ public class SellerProductController {
 
     private final ProductService productService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "Page my products", description = "seller only")
     @GetMapping
     public Result<Page<Product>> list(@AuthenticationPrincipal LoginUser loginUser,

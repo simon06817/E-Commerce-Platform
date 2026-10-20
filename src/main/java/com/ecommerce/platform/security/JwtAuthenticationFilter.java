@@ -15,17 +15,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * Reads the Bearer token from each request, validates it and puts the
- * authenticated {@link com.ecommerce.platform.common.LoginUser} into the
- * Spring Security context.
- */
+/** JWT 认证过滤器。 */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
 
+    /** 执行请求过滤处理。 */
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,

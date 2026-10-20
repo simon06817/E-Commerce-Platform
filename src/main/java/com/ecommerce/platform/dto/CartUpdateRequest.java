@@ -4,9 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-/**
- * Request body for changing the quantity of a cart line.
- */
+/** 修改购物车请求对象。 */
 @Data
 public class CartUpdateRequest {
 

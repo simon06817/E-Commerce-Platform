@@ -18,9 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Administrator order management, including force cancellation.
- */
+/** 管理端订单接口。 */
 @Tag(name = "Admin orders", description = "admin order query and force cancellation")
 @RestController
 @RequestMapping("/api/admin/orders")
@@ -31,6 +29,7 @@ public class AdminOrderController {
 
     private final OrderService orderService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "Page all orders")
     @GetMapping
     public Result<Page<Order>> list(@RequestParam(defaultValue = "1") int page,
@@ -41,12 +40,14 @@ public class AdminOrderController {
         return Result.success(orderService.getAdminOrderPage(page, size, orderNo, buyerId, status));
     }
 
+    /** 根据主键查询数据。 */
     @Operation(summary = "Admin order detail")
     @GetMapping("/{id}")
     public Result<OrderVO> getById(@PathVariable @NotNull Long id) {
         return Result.success(orderService.getAdminOrderDetail(id));
     }
 
+    /** 强制关闭订单。 */
     @Operation(summary = "Force cancel order", description = "unpaid/paid/shipped orders only")
     @PutMapping("/{id}/force-cancel")
     public Result<Void> forceCancel(@PathVariable @NotNull Long id) {

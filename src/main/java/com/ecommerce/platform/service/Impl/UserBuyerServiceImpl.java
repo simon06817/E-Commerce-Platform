@@ -9,22 +9,23 @@ import com.ecommerce.platform.service.UserBuyerService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-/**
- * Default buyer account service.
- */
+/** 买家账号服务实现。 */
 @Service
 public class UserBuyerServiceImpl extends ServiceImpl<UserBuyerMapper, UserBuyer> implements UserBuyerService {
 
+    /** 根据用户名查询账号。 */
     @Override
     public UserBuyer getByUsername(String username) {
         return lambdaQuery().eq(UserBuyer::getUsername, username).one();
     }
 
+    /** 判断用户名是否已存在。 */
     @Override
     public boolean existsByUsername(String username) {
         return lambdaQuery().eq(UserBuyer::getUsername, username).count() > 0;
     }
 
+    /** 按关键词分页查询账号。 */
     @Override
     public Page<UserBuyer> pageWithKeyword(int current, int size, String keyword) {
         Page<UserBuyer> page = new Page<>(current, size);

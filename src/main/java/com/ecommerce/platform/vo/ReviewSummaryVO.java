@@ -3,9 +3,7 @@ package com.ecommerce.platform.vo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
-/**
- * Aggregated rating information for one product.
- */
+/** 评价汇总返回对象。 */
 @Data
 @AllArgsConstructor
 public class ReviewSummaryVO {

@@ -18,9 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Notification endpoints for buyers, sellers and admins.
- */
+/** 通知接口。 */
 @Tag(name = "Notifications", description = "order event notifications")
 @RestController
 @RequestMapping("/api/notifications")
@@ -30,6 +28,7 @@ public class NotificationController {
 
     private final OrderNotificationService notificationService;
 
+    /** 查询当前用户通知。 */
     @Operation(summary = "My notifications", description = "current authenticated user")
     @GetMapping("/my")
     public Result<Page<OrderNotification>> my(@AuthenticationPrincipal LoginUser loginUser,
@@ -39,6 +38,7 @@ public class NotificationController {
                 loginUser.getRole().name(), loginUser.getId(), page, size));
     }
 
+    /** 将通知标记为已读。 */
     @Operation(summary = "Mark notification as read")
     @PutMapping("/{id}/read")
     public Result<Void> read(@AuthenticationPrincipal LoginUser loginUser,

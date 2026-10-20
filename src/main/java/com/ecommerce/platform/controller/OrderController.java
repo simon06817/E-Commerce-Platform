@@ -26,9 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Buyer order endpoints: create, pay, cancel, confirm receipt and query.
- */
+/** 订单接口。 */
 @Tag(name = "Orders", description = "buyer order management")
 @RestController
 @RequestMapping("/api/orders")
@@ -38,6 +36,7 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "Page my orders", description = "buyer only")
     @GetMapping
     @PreAuthorize("hasRole('BUYER')")
@@ -50,6 +49,7 @@ public class OrderController {
                 loginUser.getId(), page, size, status, reviewed));
     }
 
+    /** 分页查询订单及明细。 */
     @Operation(summary = "Page my order details in one request", description = "buyer only")
     @GetMapping("/page-details")
     @PreAuthorize("hasRole('BUYER')")
@@ -62,6 +62,7 @@ public class OrderController {
                 loginUser.getId(), page, size, status, reviewed));
     }
 
+    /** 根据主键查询数据。 */
     @Operation(summary = "Order detail", description = "buyer only")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('BUYER')")
@@ -70,6 +71,7 @@ public class OrderController {
         return Result.success(orderService.getOrderDetail(loginUser.getId(), id));
     }
 
+    /** 创建订单。 */
     @Operation(summary = "Create order from cart", description = "buyer only")
     @PostMapping
     @PreAuthorize("hasRole('BUYER')")
@@ -81,6 +83,7 @@ public class OrderController {
                 .toList());
     }
 
+    /** 取消订单。 */
     @Operation(summary = "Cancel order", description = "buyer only")
     @PutMapping("/{id}/cancel")
     @PreAuthorize("hasRole('BUYER')")
@@ -90,6 +93,7 @@ public class OrderController {
         return Result.success();
     }
 
+    /** 支付订单。 */
     @Operation(summary = "Pay order", description = "buyer only")
     @PutMapping("/{id}/pay")
     @PreAuthorize("hasRole('BUYER')")
@@ -99,6 +103,7 @@ public class OrderController {
         return Result.success();
     }
 
+    /** 确认收货。 */
     @Operation(summary = "Confirm receipt", description = "buyer only")
     @PutMapping("/{id}/confirm")
     @PreAuthorize("hasRole('BUYER')")

@@ -22,10 +22,7 @@ import org.slf4j.MDC;
 
 import java.util.List;
 
-/**
- * RabbitMQ consumer for order events. Records each event once, making message
- * delivery idempotent even when the broker redelivers.
- */
+/** 订单创建事件监听器。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -42,12 +39,14 @@ public class OrderCreatedEventListener {
     private final ProductService productService;
     private final ObjectMapper objectMapper;
 
+    /** 消费订单事件并保证幂等。 */
     @RabbitListener(queues = "${app.rabbitmq.order-queue}")
     @Transactional(rollbackFor = Exception.class)
     public void onOrderEvent(OrderEventMessage message) {
         String traceId = TraceContext.normalizeOrCreate(message.traceId());
         String payload = payloadJson(message);
         try (MDC.MDCCloseable ignored = TraceContext.withTraceId(traceId)) {
+            // 先写入消费记录，重复消息会被唯一键拦截。
             boolean firstDelivery = orderEventRecordService.recordIfAbsent(
                     message.orderId(), message.eventType(), payload, traceId);
             if (!firstDelivery) {
@@ -69,6 +68,7 @@ public class OrderCreatedEventListener {
         }
     }
 
+    /** 序列化事件消息。 */
     private String payloadJson(OrderEventMessage message) {
         try {
             return objectMapper.writeValueAsString(message);
@@ -77,6 +77,7 @@ public class OrderCreatedEventListener {
         }
     }
 
+    /** 创建买家订单创建通知。 */
     private void notifyBuyerOrderCreated(Long orderId) {
         Order order = orderService.getById(orderId);
         if (order == null) {
@@ -88,6 +89,7 @@ public class OrderCreatedEventListener {
                 "您的订单 " + order.getOrderNo() + " 已创建。");
     }
 
+    /** 创建订单支付通知。 */
     private void notifyOrderPaid(Long orderId) {
         Order order = orderService.getById(orderId);
         if (order == null) {

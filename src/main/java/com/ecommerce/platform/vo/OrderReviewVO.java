@@ -4,9 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Review information attached to an order item in the buyer order detail.
- */
+/** 订单评价返回对象。 */
 @Data
 public class OrderReviewVO {
 

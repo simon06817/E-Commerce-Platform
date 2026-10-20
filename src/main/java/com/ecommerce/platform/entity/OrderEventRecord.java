@@ -9,10 +9,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Inbox record proving an MQ event was consumed. The unique key
- * (order_id, event_type) makes message consumption idempotent.
- */
+/** 订单事件消费记录实体。 */
 @Data
 @TableName("order_event_record")
 public class OrderEventRecord {

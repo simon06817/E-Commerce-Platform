@@ -3,9 +3,7 @@ package com.ecommerce.platform.dto;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * Seller handling note for approve/reject actions.
- */
+/** 退款处理请求对象。 */
 @Data
 public class ReturnHandleRequest {
 

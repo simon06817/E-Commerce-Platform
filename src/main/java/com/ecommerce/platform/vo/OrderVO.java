@@ -7,10 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Order view object returned to clients, including item snapshots and a
- * human-readable status description.
- */
+/** 订单返回对象。 */
 @Data
 public class OrderVO {
 

@@ -7,9 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Periodically closes unpaid orders that exceeded the configured timeout.
- */
+/** 订单超时定时任务。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -23,6 +21,7 @@ public class OrderTimeoutScheduler {
     @Value("${app.order.auto-complete-hours:24}")
     private int autoCompleteHours;
 
+    /** 关闭超时未支付订单。 */
     @Scheduled(
             initialDelayString = "${app.order.close-initial-delay-ms:60000}",
             fixedDelayString = "${app.order.close-scan-interval-ms:60000}")
@@ -33,6 +32,7 @@ public class OrderTimeoutScheduler {
         }
     }
 
+    /** 自动完成已发货订单。 */
     @Scheduled(
             initialDelayString = "${app.order.auto-complete-initial-delay-ms:60000}",
             fixedDelayString = "${app.order.auto-complete-scan-interval-ms:60000}")

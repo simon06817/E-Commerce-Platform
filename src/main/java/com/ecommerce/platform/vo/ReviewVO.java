@@ -4,9 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Public review representation with a masked buyer name.
- */
+/** 商品评价返回对象。 */
 @Data
 public class ReviewVO {
 

@@ -8,15 +8,11 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password: ""
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema-test.sql
-      data-locations: classpath:data-test.sql
   cache:
     type: simple
   flyway:
-    enabled: false
+    enabled: true
+    locations: classpath:db/testmigration
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss

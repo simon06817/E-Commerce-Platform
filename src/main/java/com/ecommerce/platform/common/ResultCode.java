@@ -2,9 +2,7 @@ package com.ecommerce.platform.common;
 
 import lombok.Getter;
 
-/**
- * Central catalogue of business and HTTP result codes.
- */
+/** 结果码枚举。 */
 @Getter
 public enum ResultCode {
     SUCCESS(200, "操作成功"),
@@ -32,6 +30,7 @@ public enum ResultCode {
     private final int code;
     private final String message;
 
+    /** 构造结果码。 */
     ResultCode(int code, String message) {
         this.code = code;
         this.message = message;

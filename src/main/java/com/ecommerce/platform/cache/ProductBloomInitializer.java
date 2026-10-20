@@ -7,9 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-/**
- * Loads existing product ids into the bloom filter at application startup.
- */
+/** 商品布隆过滤器初始化器。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -18,6 +16,7 @@ public class ProductBloomInitializer implements CommandLineRunner {
     private final ProductBloomFilter bloomFilter;
     private final ProductMapper productMapper;
 
+    /** 初始化商品布隆过滤器。 */
     @Override
     public void run(String... args) {
         java.util.List<Long> ids = productMapper.selectList(null).stream()

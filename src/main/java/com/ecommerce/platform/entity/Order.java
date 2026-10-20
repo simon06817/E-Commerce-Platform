@@ -13,9 +13,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * Order header. Maps to {@code order_info}; status uses {@code OrderStatusEnum}.
- */
+/** 订单实体。 */
 @Data
 @TableName("order_info")
 public class Order {
@@ -34,16 +32,11 @@ public class Order {
     @NotNull(message = "buyer id must not be null")
     private Long buyerId;
 
-    /**
-     * Seller owning this split order. Null on legacy orders created before
-     * seller-based order splitting was introduced.
-     */
+    /** 拆单订单所属卖家；历史订单可能为空。 */
     @TableField("seller_id")
     private Long sellerId;
 
-    /**
-     * Groups split seller orders created from one checkout submission.
-     */
+    /** 同一次结算生成的卖家订单分组标识。 */
     @TableField("checkout_group_id")
     private String checkoutGroupId;
 

@@ -4,9 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ecommerce.platform.entity.ProductCategory;
 import org.apache.ibatis.annotations.Mapper;
 
-/**
- * MyBatis-Plus mapper for product categories.
- */
+/** 商品分类数据访问接口。 */
 @Mapper
 public interface ProductCategoryMapper extends BaseMapper<ProductCategory> {
 }

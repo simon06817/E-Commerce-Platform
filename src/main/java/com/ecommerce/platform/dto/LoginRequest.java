@@ -5,9 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-/**
- * Login request carrying the selected role, username and password.
- */
+/** 登录请求对象。 */
 @Data
 public class LoginRequest {
 

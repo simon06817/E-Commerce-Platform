@@ -18,9 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Self-service profile endpoints for buyer and seller accounts.
- */
+/** 用户资料接口。 */
 @Tag(name = "Profile", description = "buyer and seller profile management")
 @RestController
 @RequestMapping("/api/profile")
@@ -30,12 +28,14 @@ public class ProfileController {
 
     private final ProfileService profileService;
 
+    /** 查询当前用户资料。 */
     @Operation(summary = "Get my profile")
     @GetMapping
     public Result<ProfileVO> get(@AuthenticationPrincipal LoginUser loginUser) {
         return Result.success(profileService.getProfile(loginUser));
     }
 
+    /** 修改当前用户资料。 */
     @Operation(summary = "Update my profile")
     @PutMapping
     public Result<ProfileVO> update(@AuthenticationPrincipal LoginUser loginUser,
@@ -43,6 +43,7 @@ public class ProfileController {
         return Result.success(profileService.updateProfile(loginUser, request));
     }
 
+    /** 修改当前用户密码。 */
     @Operation(summary = "Change my password")
     @PutMapping("/password")
     public Result<Void> changePassword(@AuthenticationPrincipal LoginUser loginUser,

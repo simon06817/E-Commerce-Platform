@@ -12,9 +12,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Buyer account used for cart, order and payment operations.
- */
+/** 买家账号实体。 */
 @Data
 @TableName("user_buyer")
 public class UserBuyer {

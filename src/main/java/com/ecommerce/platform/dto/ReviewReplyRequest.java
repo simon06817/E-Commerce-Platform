@@ -4,9 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * Seller reply to one product review.
- */
+/** 回复评价请求对象。 */
 @Data
 public class ReviewReplyRequest {
 

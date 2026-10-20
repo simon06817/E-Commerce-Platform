@@ -6,12 +6,11 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
-/**
- * Populates create/update timestamps automatically for MyBatis-Plus entities.
- */
+/** 字段自动填充处理器。 */
 @Component
 public class MyMetaObjectHandler implements MetaObjectHandler {
 
+    /** 填充新增记录的公共字段。 */
     @Override
     public void insertFill(MetaObject metaObject) {
         LocalDateTime now = LocalDateTime.now();
@@ -19,6 +18,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         strictInsertFill(metaObject, "updateTime", LocalDateTime.class, now);
     }
 
+    /** 填充更新记录的公共字段。 */
     @Override
     public void updateFill(MetaObject metaObject) {
         strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());

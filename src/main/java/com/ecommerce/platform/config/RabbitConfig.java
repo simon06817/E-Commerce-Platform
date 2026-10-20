@@ -15,15 +15,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Declares the order exchange/queue bindings and the JSON message converter
- * used by the after-commit event publisher and the event listener.
- */
+/** RabbitMQ 配置。 */
 @Configuration
 @ConditionalOnProperty(name = "app.mq.enabled", havingValue = "true")
 @Slf4j
 public class RabbitConfig {
 
+    /** 创建订单队列。 */
     @Bean
     public Queue orderQueue(@Value("${app.rabbitmq.order-queue}") String queue,
                             @Value("${app.rabbitmq.order-dead-letter-exchange}") String deadLetterExchange,
@@ -34,11 +32,13 @@ public class RabbitConfig {
                 .build();
     }
 
+    /** 创建订单交换机。 */
     @Bean
     public DirectExchange orderExchange(@Value("${app.rabbitmq.order-exchange}") String exchange) {
         return new DirectExchange(exchange, true, false);
     }
 
+    /** 绑定订单创建事件路由。 */
     @Bean
     public Binding orderCreatedBinding(Queue orderQueue,
                                        DirectExchange orderExchange,
@@ -46,6 +46,7 @@ public class RabbitConfig {
         return BindingBuilder.bind(orderQueue).to(orderExchange).with(routingKey);
     }
 
+    /** 绑定订单支付事件路由。 */
     @Bean
     public Binding orderPaidBinding(Queue orderQueue,
                                     DirectExchange orderExchange,
@@ -53,17 +54,20 @@ public class RabbitConfig {
         return BindingBuilder.bind(orderQueue).to(orderExchange).with(routingKey);
     }
 
+    /** 创建订单死信队列。 */
     @Bean
     public Queue orderDeadLetterQueue(@Value("${app.rabbitmq.order-dead-letter-queue}") String queue) {
         return QueueBuilder.durable(queue).build();
     }
 
+    /** 创建订单死信交换机。 */
     @Bean
     public DirectExchange orderDeadLetterExchange(
             @Value("${app.rabbitmq.order-dead-letter-exchange}") String exchange) {
         return new DirectExchange(exchange, true, false);
     }
 
+    /** 绑定订单死信队列路由。 */
     @Bean
     public Binding orderDeadLetterBinding(
             Queue orderDeadLetterQueue,
@@ -72,11 +76,13 @@ public class RabbitConfig {
         return BindingBuilder.bind(orderDeadLetterQueue).to(orderDeadLetterExchange).with(routingKey);
     }
 
+    /** 创建消息转换器。 */
     @Bean
     public MessageConverter messageConverter() {
         return new Jackson2JsonMessageConverter();
     }
 
+    /** 创建 RabbitMQ 消息模板。 */
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory,
                                          MessageConverter messageConverter) {

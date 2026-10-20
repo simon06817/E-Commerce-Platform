@@ -25,9 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Administrator endpoints for viewing and removing buyer/seller accounts.
- */
+/** 管理端用户接口。 */
 @Tag(name = "Admin users", description = "admin manages buyers and sellers")
 @RestController
 @RequestMapping("/api/admin/users")
@@ -41,6 +39,7 @@ public class AdminUserController {
     private final CartService cartService;
     private final ProductService productService;
 
+    /** 分页查询买家账号。 */
     @Operation(summary = "List buyers")
     @GetMapping("/buyers")
     public Result<Page<UserBuyer>> buyers(@RequestParam(defaultValue = "1") int page,
@@ -49,6 +48,7 @@ public class AdminUserController {
         return Result.success(buyerService.pageWithKeyword(page, size, keyword));
     }
 
+    /** 分页查询卖家账号。 */
     @Operation(summary = "List sellers")
     @GetMapping("/sellers")
     public Result<Page<UserSeller>> sellers(@RequestParam(defaultValue = "1") int page,
@@ -57,6 +57,7 @@ public class AdminUserController {
         return Result.success(sellerService.pageWithKeyword(page, size, keyword));
     }
 
+    /** 删除买家账号。 */
     @Operation(summary = "Delete buyer")
     @DeleteMapping("/buyers/{id}")
     public Result<Void> deleteBuyer(@PathVariable Long id) {
@@ -74,6 +75,7 @@ public class AdminUserController {
         return Result.success();
     }
 
+    /** 删除卖家账号。 */
     @Operation(summary = "Delete seller")
     @DeleteMapping("/sellers/{id}")
     public Result<Void> deleteSeller(@PathVariable Long id) {

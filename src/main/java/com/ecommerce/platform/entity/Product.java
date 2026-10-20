@@ -15,9 +15,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * Product aggregate owned by a seller. Maps to the {@code product} table.
- */
+/** 商品实体。 */
 @Data
 @TableName("product")
 public class Product {
@@ -51,9 +49,7 @@ public class Product {
     @NotNull(message = "product status must not be null")
     private Integer status;
 
-    /**
-     * Display-only shop name resolved from user_seller for list/detail responses.
-     */
+    /** 列表和详情展示的店铺名称，不参与持久化。 */
     @TableField(exist = false)
     private String sellerName;
 

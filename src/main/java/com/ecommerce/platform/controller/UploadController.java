@@ -12,9 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * Upload endpoint for images used by product and user interfaces.
- */
+/** 文件上传接口。 */
 @Tag(name = "Upload", description = "local image upload")
 @RestController
 @RequestMapping("/api/upload")
@@ -23,6 +21,7 @@ public class UploadController {
 
     private final FileStorageService fileStorageService;
 
+    /** 上传图片。 */
     @Operation(summary = "Upload image", description = "any authenticated user")
     @PostMapping("/image")
     @PreAuthorize("isAuthenticated()")

@@ -4,9 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-/**
- * Product recommendation ranked by paid sales and verified-purchase reviews.
- */
+/** 商品推荐返回对象。 */
 @Data
 public class ProductRecommendationVO {
 

@@ -8,10 +8,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.function.Supplier;
 
-/**
- * Cache helper implementing the read-through pattern with cache breakdown
- * protection and optional negative caching for missing records.
- */
+/** 缓存支持组件。 */
 @Component
 @RequiredArgsConstructor
 public class CacheSupport {
@@ -24,8 +21,9 @@ public class CacheSupport {
     private final CacheManager cacheManager;
     private final CacheLockService lockService;
 
+    /** 缓存未命中时加载数据。 */
     public <T> T getOrLoad(String cacheName, String key, Supplier<T> loader) {
-        // Fast path: serve directly from cache without taking the lock.
+        // 缓存命中时直接返回，不获取锁。
         Cache cache = cacheManager.getCache(cacheName);
         T cached = read(cache, key);
         if (cached != null) {
@@ -34,7 +32,7 @@ public class CacheSupport {
 
         String lockKey = lockKey(cacheName, key);
         String token = lockService.newToken();
-        // Only one request may rebuild a hot key; others wait and re-read cache.
+        // 热点键仅允许一个请求回源，其余请求等待后重读缓存。
         if (lockService.tryLock(lockKey, token, LOCK_TTL)) {
             try {
                 T doubleCheck = read(cache, key);
@@ -55,11 +53,12 @@ public class CacheSupport {
         return waited != null ? waited : loader.get();
     }
 
+    /** 通过正负缓存加载商品数据。 */
     public <T> T getOrLoadWithNegativeCache(String positiveCacheName,
                                             String negativeCacheName,
                                             String key,
                                             Supplier<T> loader) {
-        // Negative cache protects the database from repeated lookups of missing ids.
+        // 负缓存避免不存在的 ID 反复查询数据库。
         Cache positive = cacheManager.getCache(positiveCacheName);
         Cache negative = cacheManager.getCache(negativeCacheName);
 
@@ -106,6 +105,7 @@ public class CacheSupport {
         return loader.get();
     }
 
+    /** 写入缓存数据。 */
     public void put(String cacheName, String key, Object value) {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache != null) {
@@ -113,6 +113,7 @@ public class CacheSupport {
         }
     }
 
+    /** 读取缓存数据。 */
     @SuppressWarnings("unchecked")
     private <T> T read(Cache cache, String key) {
         if (cache == null) {
@@ -122,6 +123,7 @@ public class CacheSupport {
         return wrapper == null ? null : (T) wrapper.get();
     }
 
+    /** 等待其他请求回源后重读缓存。 */
     private <T> T waitForCache(Cache positive, Cache negative, String key) {
         for (int i = 0; i < WAIT_ROUNDS; i++) {
             sleepQuietly();
@@ -136,10 +138,12 @@ public class CacheSupport {
         return null;
     }
 
+    /** 生成缓存锁键。 */
     private String lockKey(String cacheName, String key) {
         return "lock:" + cacheName + ":" + key;
     }
 
+    /** 等待并忽略线程中断。 */
     private void sleepQuietly() {
         try {
             Thread.sleep(WAIT_MILLIS);

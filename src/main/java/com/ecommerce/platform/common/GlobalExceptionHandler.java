@@ -10,14 +10,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-/**
- * Converts exceptions thrown by controllers and services into the unified
- * {@link Result} envelope.
- */
+/** 全局异常处理器。 */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** 处理参数校验异常。 */
     @ExceptionHandler({BindException.class, MethodArgumentNotValidException.class})
     public ResponseEntity<Result<Void>> handleValidationException(Exception e) {
         String msg = "请求参数错误";
@@ -31,22 +29,26 @@ public class GlobalExceptionHandler {
                 .body(Result.error(ResultCode.BAD_REQUEST.getCode(), msg));
     }
 
+    /** 处理权限不足异常。 */
     @ExceptionHandler(AuthorizationDeniedException.class)
     public ResponseEntity<Result<Void>> handleAuthorizationDenied(AuthorizationDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Result.error(ResultCode.FORBIDDEN));
     }
 
+    /** 处理资源不存在异常。 */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Result<Void>> handleNoResource(NoResourceFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Result.error(ResultCode.NOT_FOUND));
     }
 
+    /** 处理业务异常。 */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(BusinessException e) {
         return ResponseEntity.status(statusFor(e.getResultCode()))
                 .body(Result.error(e.getResultCode().getCode(), e.getMessage()));
     }
 
+    /** 处理运行时异常。 */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Result<Void>> handleRuntimeException(RuntimeException e) {
         log.error("runtime exception", e);
@@ -54,6 +56,7 @@ public class GlobalExceptionHandler {
                 .body(Result.error(ResultCode.INTERNAL_SERVER_ERROR));
     }
 
+    /** 处理未分类异常。 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleException(Exception e) {
         log.error("unexpected exception", e);
@@ -61,6 +64,7 @@ public class GlobalExceptionHandler {
                 .body(Result.error(ResultCode.INTERNAL_SERVER_ERROR));
     }
 
+    /** 将结果码转换为 HTTP 状态。 */
     private HttpStatus statusFor(ResultCode resultCode) {
         return switch (resultCode) {
             case BAD_REQUEST, INVALID_ROLE -> HttpStatus.BAD_REQUEST;

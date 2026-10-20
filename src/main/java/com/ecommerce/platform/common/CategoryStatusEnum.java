@@ -2,9 +2,7 @@ package com.ecommerce.platform.common;
 
 import lombok.Getter;
 
-/**
- * Category enabled status. Values match the {@code product_category.status} column.
- */
+/** 商品分类状态枚举。 */
 @Getter
 public enum CategoryStatusEnum {
     DISABLED(0, "已禁用"),
@@ -13,11 +11,13 @@ public enum CategoryStatusEnum {
     private final int code;
     private final String desc;
 
+    /** 构造商品分类状态枚举。 */
     CategoryStatusEnum(int code, String desc) {
         this.code = code;
         this.desc = desc;
     }
 
+    /** 根据状态码获取枚举。 */
     public static CategoryStatusEnum fromCode(int code) {
         for (CategoryStatusEnum status : values()) {
             if (status.code == code) {

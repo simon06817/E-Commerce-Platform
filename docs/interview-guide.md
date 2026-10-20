@@ -143,7 +143,7 @@
 >
 > 项目后期补充了 Redis 缓存防护、N+1 优化、Trace ID、Actuator 健康检查、
 > Agent 轻量指标、Testcontainers、Docker Compose 和 GitHub Actions。当前 Java
-> 测试 49 个，Agent 测试 50 个，前端生产构建和 CI 均通过。
+> 测试 50 个，Agent 测试 50 个，前端生产构建和 CI 均通过。
 
 ## 五、系统架构
 
@@ -619,13 +619,15 @@ Agent：调用 Java 加入购物车接口
 ### 12.1 Java
 
 - H2 + MockMvc 覆盖业务和权限流程。
+- H2 测试数据由测试专用 Flyway 迁移初始化。
 - Testcontainers 启动真实 MySQL、Redis 和 RabbitMQ。
+- Testcontainers 执行生产 V1-V15 迁移，并断言迁移版本为 V15。
 - 并发库存竞争测试。
 - 并发发货测试。
 - 下单事务回滚测试。
 - 重复支付测试。
 - 重复 RabbitMQ 消费测试。
-- 当前 49 个测试通过。
+- 当前 50 个测试通过。
 
 ### 12.2 Agent
 

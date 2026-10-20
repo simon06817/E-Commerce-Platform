@@ -11,13 +11,12 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Notification service with a unique-key based idempotency guard.
- */
+/** 订单通知服务实现。 */
 @Service
 public class OrderNotificationServiceImpl extends ServiceImpl<OrderNotificationMapper, OrderNotification>
         implements OrderNotificationService {
 
+    /** 幂等创建订单通知。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createIfAbsent(Long orderId, String eventType, Long recipientId, String recipientRole,
@@ -41,10 +40,11 @@ public class OrderNotificationServiceImpl extends ServiceImpl<OrderNotificationM
         try {
             save(notification);
         } catch (DuplicateKeyException ignored) {
-            // Concurrent duplicate delivery.
+            // 并发重复投递。
         }
     }
 
+    /** 查询当前用户通知。 */
     @Override
     public Page<OrderNotification> getMyNotifications(String recipientRole, Long recipientId,
                                                       int current, int size) {
@@ -55,6 +55,7 @@ public class OrderNotificationServiceImpl extends ServiceImpl<OrderNotificationM
                 .page(new Page<>(current, size));
     }
 
+    /** 将通知标记为已读。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void markRead(String recipientRole, Long recipientId, Long notificationId) {

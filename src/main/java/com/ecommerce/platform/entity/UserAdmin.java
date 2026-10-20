@@ -12,9 +12,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Administrator account. Stored separately from buyers and sellers.
- */
+/** 管理员账号实体。 */
 @Data
 @TableName("user_admin")
 public class UserAdmin {

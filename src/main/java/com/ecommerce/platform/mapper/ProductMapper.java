@@ -9,12 +9,11 @@ import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
 
-/**
- * MyBatis-Plus mapper for products.
- */
+/** 商品数据访问接口。 */
 @Mapper
 public interface ProductMapper extends BaseMapper<Product> {
 
+    /** 查询推荐商品。 */
     @Select("""
             SELECT p.id,
                    p.seller_id,

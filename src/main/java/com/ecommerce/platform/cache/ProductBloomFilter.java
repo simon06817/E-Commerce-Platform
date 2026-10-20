@@ -7,10 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 
-/**
- * In-memory Guava bloom filter used to reject queries for product ids that do
- * not exist, reducing cache penetration to the database.
- */
+/** 商品布隆过滤器。 */
 @Component
 public class ProductBloomFilter {
 
@@ -22,31 +19,36 @@ public class ProductBloomFilter {
             BloomFilter.create(productIdFunnel, EXPECTED_INSERTIONS, FPP);
     private volatile boolean ready;
 
+    /** 将商品 ID 加入布隆过滤器。 */
     public void add(Long id) {
         if (id != null) {
             filter.put(id);
         }
     }
 
+    /** 批量加入数据。 */
     public void addAll(Collection<Long> ids) {
         if (ids != null) {
             ids.forEach(this::add);
         }
     }
 
+    /** 标记布隆过滤器初始化完成。 */
     public void markReady() {
         ready = true;
     }
 
+    /** 判断布隆过滤器是否初始化完成。 */
     public boolean isReady() {
         return ready;
     }
 
+    /** 判断商品 ID 是否可能存在。 */
     public boolean mightContain(Long id) {
         if (id == null) {
             return false;
         }
-        // Before initialization completes, allow the request to reach the cache and database.
+        // 初始化完成前放行请求，避免误拦截。
         return !ready || filter.mightContain(id);
     }
 }

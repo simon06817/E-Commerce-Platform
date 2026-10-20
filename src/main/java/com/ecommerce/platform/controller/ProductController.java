@@ -28,9 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Public product browsing and seller-owned product management endpoints.
- */
+/** 商品接口。 */
 @Tag(name = "Products", description = "product browsing and seller management")
 @RestController
 @RequestMapping("/api/products")
@@ -40,6 +38,7 @@ public class ProductController {
 
     private final ProductService productService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "Page products", description = "public")
     @GetMapping
     public Result<Page<Product>> list(@RequestParam(defaultValue = "1") int page,
@@ -52,6 +51,7 @@ public class ProductController {
                 productService.getProductPage(page, size, categoryId, keyword, shopName, status));
     }
 
+    /** 查询商品推荐。 */
     @Operation(summary = "Recommend products",
             description = "public, ranked by paid sales and review rating")
     @GetMapping("/recommendations")
@@ -61,6 +61,7 @@ public class ProductController {
         return Result.success(productService.getRecommendations(categoryId, limit));
     }
 
+    /** 根据主键查询数据。 */
     @Operation(summary = "Product detail", description = "public")
     @GetMapping("/{id}")
     public Result<Product> getById(@PathVariable @NotNull Long id) {
@@ -71,6 +72,7 @@ public class ProductController {
         return Result.success(product);
     }
 
+    /** 创建商品。 */
     @Operation(summary = "Create product", description = "seller only")
     @PostMapping
     @PreAuthorize("hasRole('SELLER')")
@@ -80,6 +82,7 @@ public class ProductController {
         return Result.success();
     }
 
+    /** 修改商品。 */
     @Operation(summary = "Update product", description = "seller only, own products")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('SELLER')")
@@ -90,6 +93,7 @@ public class ProductController {
         return Result.success();
     }
 
+    /** 修改状态。 */
     @Operation(summary = "Update product status", description = "seller only, own products")
     @PutMapping("/{id}/status/{status}")
     @PreAuthorize("hasRole('SELLER')")
@@ -100,6 +104,7 @@ public class ProductController {
         return Result.success();
     }
 
+    /** 删除商品。 */
     @Operation(summary = "Delete product", description = "seller only, own products")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('SELLER')")

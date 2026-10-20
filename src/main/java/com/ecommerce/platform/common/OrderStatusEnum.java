@@ -2,10 +2,7 @@ package com.ecommerce.platform.common;
 
 import lombok.Getter;
 
-/**
- * Order lifecycle states. Service code must use these constants instead of
- * using raw numeric status values.
- */
+/** 订单状态枚举。 */
 @Getter
 public enum OrderStatusEnum {
     UNPAID(0, "未付款"),
@@ -17,12 +14,14 @@ public enum OrderStatusEnum {
     private final int code;
     private final String desc;
 
+    /** 构造订单状态枚举。 */
     OrderStatusEnum(int code, String desc) {
         this.code = code;
         this.desc = desc;
     }
 
-    //根据 code 获取枚举实例
+    // 根据状态码获取枚举。
+    /** 根据状态码获取枚举。 */
     public static OrderStatusEnum fromCode(int code) {
         for (OrderStatusEnum status : values()) {
             if (status.code == code) {

@@ -1,8 +1,6 @@
 package com.ecommerce.platform.cache;
 
-/**
- * Central cache names and default cache keys used by the cache layer.
- */
+/** 缓存名称常量。 */
 public final class CacheNames {
 
     public static final String PRODUCT_DETAIL = "productDetail";
@@ -13,6 +11,7 @@ public final class CacheNames {
 
     public static final String CATEGORY_LIST_KEY = "all";
 
+    /** 禁止实例化工具类。 */
     private CacheNames() {
     }
 }

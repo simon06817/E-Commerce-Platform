@@ -23,9 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Buyer return/refund endpoints.
- */
+/** 退款接口。 */
 @Tag(name = "Returns", description = "buyer return requests")
 @RestController
 @RequestMapping("/api/returns")
@@ -36,6 +34,7 @@ public class OrderReturnController {
 
     private final OrderReturnService orderReturnService;
 
+    /** 提交退款申请。 */
     @Operation(summary = "Apply for refund",
             description = "available after shipment, or within seven days after completion")
     @PostMapping
@@ -44,6 +43,7 @@ public class OrderReturnController {
         return Result.success(orderReturnService.applyReturn(loginUser.getId(), request));
     }
 
+    /** 查询当前用户退款申请。 */
     @Operation(summary = "My return requests")
     @GetMapping("/my")
     public Result<Page<ReturnVO>> my(@AuthenticationPrincipal LoginUser loginUser,
@@ -52,6 +52,7 @@ public class OrderReturnController {
         return Result.success(orderReturnService.getBuyerReturns(loginUser.getId(), page, size));
     }
 
+    /** 撤销退款申请。 */
     @Operation(summary = "Cancel return request", description = "only before seller handles it")
     @PutMapping("/{id}/cancel")
     public Result<Void> cancel(@AuthenticationPrincipal LoginUser loginUser,

@@ -13,9 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Administrator category list, including disabled categories.
- */
+/** 管理端商品分类接口。 */
 @Tag(name = "Admin categories", description = "admin views all category states")
 @RestController
 @RequestMapping("/api/admin/categories")
@@ -25,6 +23,7 @@ public class AdminCategoryController {
 
     private final ProductCategoryService categoryService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "Page all categories")
     @GetMapping
     public Result<Page<ProductCategory>> list(

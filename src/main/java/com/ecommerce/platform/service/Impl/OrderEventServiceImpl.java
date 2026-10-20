@@ -8,10 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
-/**
- * Publishes order domain events through Spring and lets the transaction callback
- * forward them to RabbitMQ after commit.
- */
+/** 订单事件服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class OrderEventServiceImpl implements OrderEventService {
@@ -21,16 +18,19 @@ public class OrderEventServiceImpl implements OrderEventService {
 
     private final ApplicationEventPublisher eventPublisher;
 
+    /** 发布订单创建事件。 */
     @Override
     public void publishOrderCreated(Order order) {
         publish(order, EVENT_ORDER_CREATED);
     }
 
+    /** 发布订单支付事件。 */
     @Override
     public void publishOrderPaid(Order order) {
         publish(order, EVENT_ORDER_PAID);
     }
 
+    /** 发布订单事件。 */
     private void publish(Order order, String eventType) {
         eventPublisher.publishEvent(new OrderEventMessage(
                 order.getId(),

@@ -4,9 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ecommerce.platform.entity.OrderItem;
 import org.apache.ibatis.annotations.Mapper;
 
-/**
- * MyBatis-Plus mapper for order item snapshots.
- */
+/** 订单明细数据访问接口。 */
 @Mapper
 public interface OrderItemMapper extends BaseMapper<OrderItem> {
 }

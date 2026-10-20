@@ -25,9 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * Buyer shopping cart endpoints. Buyer identity always comes from the JWT.
- */
+/** 购物车接口。 */
 @Tag(name = "Cart", description = "buyer cart management")
 @RestController
 @RequestMapping("/api/carts")
@@ -37,6 +35,7 @@ public class CartController {
 
     private final CartService cartService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "My cart", description = "buyer only")
     @GetMapping
     @PreAuthorize("hasRole('BUYER')")
@@ -44,6 +43,7 @@ public class CartController {
         return Result.success(cartService.getCartList(loginUser.getId()));
     }
 
+    /** 添加商品到购物车。 */
     @Operation(summary = "Add to cart", description = "buyer only")
     @PostMapping
     @PreAuthorize("hasRole('BUYER')")
@@ -53,6 +53,7 @@ public class CartController {
         return Result.success();
     }
 
+    /** 修改购物车商品数量。 */
     @Operation(summary = "Update cart quantity", description = "buyer only")
     @PutMapping("/{id}/num")
     @PreAuthorize("hasRole('BUYER')")
@@ -63,6 +64,7 @@ public class CartController {
         return Result.success();
     }
 
+    /** 删除购物车项。 */
     @Operation(summary = "Delete cart item", description = "buyer only")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('BUYER')")
@@ -72,6 +74,7 @@ public class CartController {
         return Result.success();
     }
 
+    /** 清空当前买家购物车。 */
     @Operation(summary = "Clear cart", description = "buyer only")
     @DeleteMapping("/clear")
     @PreAuthorize("hasRole('BUYER')")

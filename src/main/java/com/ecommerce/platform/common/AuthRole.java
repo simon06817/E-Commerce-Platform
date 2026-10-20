@@ -1,8 +1,6 @@
 package com.ecommerce.platform.common;
 
-/**
- * Supported login identities. Each role is backed by its own database table.
- */
+/** 登录角色枚举。 */
 public enum AuthRole {
     ADMIN,
     BUYER,

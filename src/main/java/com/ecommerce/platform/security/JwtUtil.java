@@ -13,9 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.UUID;
 
-/**
- * Creates and verifies short-lived stateless JWT access tokens.
- */
+/** JWT 工具。 */
 @Component
 public class JwtUtil {
 
@@ -23,6 +21,7 @@ public class JwtUtil {
     private final long accessExpireMillis;
     private final long refreshExpireMillis;
 
+    /** 创建 JWT 工具。 */
     public JwtUtil(@Value("${app.jwt.secret}") String secret,
                    @Value("${app.jwt.access-expire-minutes:15}") long accessExpireMinutes,
                    @Value("${app.jwt.refresh-expire-days:7}") long refreshExpireDays) {
@@ -31,6 +30,7 @@ public class JwtUtil {
         this.refreshExpireMillis = refreshExpireDays * 24 * 3600_000L;
     }
 
+    /** 生成访问令牌。 */
     public String generateToken(LoginUser user) {
         Date now = new Date();
         return Jwts.builder()
@@ -44,6 +44,7 @@ public class JwtUtil {
                 .compact();
     }
 
+    /** 解析访问令牌。 */
     public LoginUser parseToken(String token) {
         Claims claims = parseClaims(token);
         LoginUser user = new LoginUser(
@@ -54,14 +55,17 @@ public class JwtUtil {
         return user;
     }
 
+    /** 获取访问令牌有效秒数。 */
     public long getAccessExpireSeconds() {
         return accessExpireMillis / 1000;
     }
 
+    /** 获取刷新令牌有效秒数。 */
     public long getRefreshExpireSeconds() {
         return refreshExpireMillis / 1000;
     }
 
+    /** 解析令牌声明。 */
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(key)

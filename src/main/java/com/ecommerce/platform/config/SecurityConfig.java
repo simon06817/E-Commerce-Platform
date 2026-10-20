@@ -21,10 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import java.io.IOException;
 
-/**
- * Stateless JWT security configuration. Public endpoints stay open while all
- * other API calls require a valid token and role.
- */
+/** 安全配置。 */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -34,11 +31,13 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ObjectMapper objectMapper;
 
+    /** 创建密码编码器。 */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /** 配置安全过滤链。 */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
@@ -62,6 +61,7 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /** 写出 JSON 错误响应。 */
     private void writeJson(HttpServletResponse response, int status, Result<?> body) throws IOException {
         response.setStatus(status);
         response.setContentType("application/json;charset=UTF-8");

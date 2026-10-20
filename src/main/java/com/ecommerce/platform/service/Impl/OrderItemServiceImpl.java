@@ -6,9 +6,7 @@ import com.ecommerce.platform.mapper.OrderItemMapper;
 import com.ecommerce.platform.service.OrderItemService;
 import org.springframework.stereotype.Service;
 
-/**
- * Default MyBatis-Plus service for order item snapshots.
- */
+/** 订单明细服务实现。 */
 @Service
 public class OrderItemServiceImpl extends ServiceImpl<OrderItemMapper, OrderItem> implements OrderItemService {
 }

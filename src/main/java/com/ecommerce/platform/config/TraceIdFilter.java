@@ -13,10 +13,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Adds a request-scoped trace id to MDC and the response header. An incoming
- * trace id is accepted only when it has a safe, bounded format.
- */
+/** 链路 ID 过滤器。 */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class TraceIdFilter extends OncePerRequestFilter {
@@ -24,6 +21,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
     public static final String TRACE_ID_HEADER = TraceContext.TRACE_ID_HEADER;
     public static final String TRACE_ID_MDC_KEY = TraceContext.TRACE_ID_MDC_KEY;
 
+    /** 执行请求过滤处理。 */
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,

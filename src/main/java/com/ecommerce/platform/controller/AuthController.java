@@ -27,9 +27,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Duration;
 
-/**
- * Authentication entry points for role selection, login and registration.
- */
+/** 认证接口。 */
 @Tag(name = "Authentication", description = "role-based login and registration")
 @RestController
 @RequestMapping("/api/auth")
@@ -44,6 +42,7 @@ public class AuthController {
     @Value("${app.auth.cookie-secure:false}")
     private boolean secureCookie;
 
+    /** 用户登录并签发令牌。 */
     @Operation(summary = "Login", description = "login as ADMIN, BUYER or SELLER")
     @PostMapping("/login")
     public ResponseEntity<Result<LoginResponse>> login(HttpServletRequest httpRequest,
@@ -55,18 +54,21 @@ public class AuthController {
         return withRefreshCookie(authService.login(request));
     }
 
+    /** 注册用户账号。 */
     @Operation(summary = "Register", description = "register a buyer or seller account")
     @PostMapping("/register")
     public ResponseEntity<Result<LoginResponse>> register(@RequestBody @Valid RegisterRequest request) {
         return withRefreshCookie(authService.register(request));
     }
 
+    /** 查询当前登录用户。 */
     @Operation(summary = "Current user", description = "return the authenticated user from the JWT")
     @GetMapping("/me")
     public Result<LoginUser> me(@AuthenticationPrincipal LoginUser loginUser) {
         return Result.success(loginUser);
     }
 
+    /** 刷新访问令牌。 */
     @Operation(summary = "Refresh token", description = "exchange a refresh token for a new access token")
     @PostMapping("/refresh")
     public ResponseEntity<Result<LoginResponse>> refresh(
@@ -74,6 +76,7 @@ public class AuthController {
         return withRefreshCookie(authService.refresh(refreshToken));
     }
 
+    /** 退出登录并撤销刷新令牌。 */
     @Operation(summary = "Logout", description = "revoke the refresh token and clear its cookie")
     @PostMapping("/logout")
     public ResponseEntity<Result<Void>> logout(
@@ -84,6 +87,7 @@ public class AuthController {
                 .body(Result.success());
     }
 
+    /** 写入刷新令牌 Cookie 并返回响应。 */
     private ResponseEntity<Result<LoginResponse>> withRefreshCookie(LoginResponse response) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE,
@@ -91,6 +95,7 @@ public class AuthController {
                 .body(Result.success(response));
     }
 
+    /** 构建刷新令牌 Cookie。 */
     private ResponseCookie refreshCookie(String value, long maxAgeSeconds) {
         return ResponseCookie.from(REFRESH_COOKIE, value == null ? "" : value)
                 .httpOnly(true)

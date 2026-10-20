@@ -4,9 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ecommerce.platform.entity.Cart;
 import org.apache.ibatis.annotations.Mapper;
 
-/**
- * MyBatis-Plus mapper for the {@code cart} table.
- */
+/** 购物车数据访问接口。 */
 @Mapper
 public interface CartMapper extends BaseMapper<Cart> {
 }

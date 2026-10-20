@@ -1,4 +1,4 @@
-package com.ecommerce.platform.config; // 请替换为你的实际包路径
+package com.ecommerce.platform.config;
 
 import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
@@ -6,35 +6,30 @@ import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerIntercept
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * MyBatis-Plus 配置类 (兼容 JDK 17 & MP 3.5.15)
- * 用于启用内部分页插件功能
- */
+/** MyBatis-Plus 配置。 */
 @Configuration
 public class MybatisPlusConfig {
 
-    /**
-     * 注入分页拦截器容器
-     */
+    /** 注入分页拦截器。 */
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
-        // 1. 创建核心插件容器
+        // 创建分页插件。
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
-        // 2. 实例化分页内部拦截器 (PaginationInnerInterceptor)
+        // 创建分页内部拦截器。
         PaginationInnerInterceptor paginationInnerInterceptor = new PaginationInnerInterceptor();
 
-        // 3. 设置数据库类型 (根据你的实际数据库类型修改, 如 MYSQL, POSTGRE_SQL, ORACLE)
+        // 设置数据库类型。
         paginationInnerInterceptor.setDbType(DbType.MYSQL);
 
-        // 4. 可选: 设置溢出处理 (如: overflow=false 超出总页数返回空数据而不是最后一页)
+        // 超出总页数时返回空数据。
         paginationInnerInterceptor.setOverflow(false);
 
-        // 5. 可选: 单页最大查询限制 (限制攻击, 默认无限制)
-        // Hard cap every page query at 100 rows to avoid oversized requests.
+        // 限制单页最大查询条数。
+        // 单页最多查询 100 条。
         paginationInnerInterceptor.setMaxLimit(100L);
 
-        // 6. 将分页插件添加到拦截器链中 (建议排在第一位)
+        // 将分页插件加入拦截器链。
         interceptor.addInnerInterceptor(paginationInnerInterceptor);
 
         return interceptor;

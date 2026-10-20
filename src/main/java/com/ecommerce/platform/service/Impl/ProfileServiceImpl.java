@@ -19,9 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Profile service. Username changes are intentionally not supported.
- */
+/** 用户资料服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class ProfileServiceImpl implements ProfileService {
@@ -31,6 +29,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final UserAdminService userAdminService;
     private final PasswordEncoder passwordEncoder;
 
+    /** 查询当前用户资料。 */
     @Override
     public ProfileVO getProfile(LoginUser loginUser) {
         if (loginUser.getRole() == AuthRole.BUYER) {
@@ -45,6 +44,7 @@ public class ProfileServiceImpl implements ProfileService {
         throw new BusinessException(ResultCode.INVALID_ROLE);
     }
 
+    /** 修改当前用户资料。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ProfileVO updateProfile(LoginUser loginUser, ProfileUpdateRequest request) {
@@ -84,6 +84,7 @@ public class ProfileServiceImpl implements ProfileService {
         throw new BusinessException(ResultCode.INVALID_ROLE);
     }
 
+    /** 修改当前用户密码。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void changePassword(LoginUser loginUser, PasswordChangeRequest request) {
@@ -112,12 +113,14 @@ public class ProfileServiceImpl implements ProfileService {
         throw new BusinessException(ResultCode.INVALID_ROLE);
     }
 
+    /** 校验旧密码并设置新密码。 */
     private void verifyAndSetPassword(String stored, String oldPassword, String encoded) {
         if (stored == null || !passwordEncoder.matches(oldPassword, stored)) {
             throw new BusinessException(ResultCode.USERNAME_OR_PASSWORD_ERROR);
         }
     }
 
+    /** 转换买家资料返回对象。 */
     private ProfileVO toBuyerVO(UserBuyer buyer) {
         if (buyer == null) {
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
@@ -133,6 +136,7 @@ public class ProfileServiceImpl implements ProfileService {
         return vo;
     }
 
+    /** 转换卖家资料返回对象。 */
     private ProfileVO toSellerVO(UserSeller seller) {
         if (seller == null) {
             throw new BusinessException(ResultCode.USER_NOT_EXIST);
@@ -147,6 +151,7 @@ public class ProfileServiceImpl implements ProfileService {
         return vo;
     }
 
+    /** 转换管理员资料返回对象。 */
     private ProfileVO toAdminVO(UserAdmin admin) {
         if (admin == null) {
             throw new BusinessException(ResultCode.USER_NOT_EXIST);

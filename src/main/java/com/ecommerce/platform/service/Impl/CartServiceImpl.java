@@ -17,15 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Cart operations enforcing buyer ownership and product availability.
- */
+/** 购物车服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements CartService {
 
     private final ProductService productService;
 
+    /** 查询购物车列表。 */
     @Override
     public List<Cart> getCartList(Long buyerId) {
         return lambdaQuery()
@@ -34,6 +33,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements Ca
                 .list();
     }
 
+    /** 添加商品到购物车。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void addCart(Long buyerId, Long productId, Integer num) {
@@ -58,6 +58,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements Ca
         }
     }
 
+    /** 修改购物车商品数量。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateCartNum(Long buyerId, Long cartId, Integer num) {
@@ -69,6 +70,7 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements Ca
         updateById(cart);
     }
 
+    /** 删除购物车项。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteCart(Long buyerId, Long cartId) {
@@ -79,12 +81,14 @@ public class CartServiceImpl extends ServiceImpl<CartMapper, Cart> implements Ca
         removeById(cartId);
     }
 
+    /** 清空购物车。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void clearCart(Long buyerId) {
         remove(new LambdaQueryWrapper<Cart>().eq(Cart::getBuyerId, buyerId));
     }
 
+    /** 删除结算成功的购物车项。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void removeSelected(Long buyerId, Collection<Long> cartIds) {

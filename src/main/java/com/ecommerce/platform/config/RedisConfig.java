@@ -22,15 +22,13 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
 
-/**
- * Redis cache configuration. Adds TTL jitter to every entry and provides the
- * template used for object serialization.
- */
+/** Redis 缓存配置。 */
 @Configuration
 @EnableCaching
 @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis", matchIfMissing = true)
 public class RedisConfig {
 
+    /** 创建 Redis 操作模板。 */
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
@@ -45,6 +43,7 @@ public class RedisConfig {
         return template;
     }
 
+    /** 创建缓存管理器。 */
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory factory) {
         RedisCacheConfiguration positiveConfig = RedisCacheConfiguration.defaultCacheConfig()
@@ -64,6 +63,7 @@ public class RedisConfig {
                 .build();
     }
 
+    /** 创建 Redis 对象序列化器。 */
     private ObjectMapper redisObjectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());

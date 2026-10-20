@@ -11,9 +11,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Shopping cart line belonging to one buyer. Maps to the {@code cart} table.
- */
+/** 购物车实体。 */
 @Data
 @TableName("cart")
 public class Cart {

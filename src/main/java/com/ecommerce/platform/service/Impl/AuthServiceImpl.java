@@ -24,10 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
-/**
- * Authenticates accounts against the role-specific tables, issues short-lived
- * access tokens plus refresh tokens and supports logout/refresh flows.
- */
+/** 认证服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -41,9 +38,10 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
     private final TokenStore tokenStore;
 
+    /** 用户登录并签发令牌。 */
     @Override
     public LoginResponse login(LoginRequest request) {
-        // Resolve the correct role table before verifying the password.
+        // 校验密码前先选择对应角色表。
         String username = request.getUsername().trim();
         String displayName = username;
         Long userId;
@@ -83,12 +81,15 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!passwordEncoder.matches(request.getPassword(), storedPassword)) {
+            // 密码错误时统一返回账号或密码错误，避免泄露账号是否存在。
             throw new BusinessException(ResultCode.USERNAME_OR_PASSWORD_ERROR);
         }
         LoginUser loginUser = new LoginUser(userId, username, request.getRole());
+        // 登录成功后同时签发短期访问令牌和可轮换刷新令牌。
         return issueTokens(loginUser, displayName);
     }
 
+    /** 注册用户账号。 */
     @Override
     public LoginResponse register(RegisterRequest request) {
         if (request.getRole() == AuthRole.ADMIN) {
@@ -139,23 +140,28 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
+    /** 刷新访问令牌。 */
     @Override
     public LoginResponse refresh(String refreshToken) {
+        // 刷新令牌只能使用一次，消费成功后签发新的访问令牌和刷新令牌。
         TokenStore.RefreshInfo info = tokenStore.consumeRefresh(refreshToken)
                 .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED));
         LoginUser user = new LoginUser(info.userId(), info.username(), AuthRole.valueOf(info.role()));
         return issueTokens(user, info.displayName(), info.familyId());
     }
 
+    /** 退出登录并撤销刷新令牌。 */
     @Override
     public void logout(String refreshToken) {
         tokenStore.deleteRefresh(refreshToken);
     }
 
+    /** 签发访问令牌和刷新令牌。 */
     private LoginResponse issueTokens(LoginUser user, String displayName) {
         return issueTokens(user, displayName, tokenStore.newFamilyId());
     }
 
+    /** 签发访问令牌和刷新令牌。 */
     private LoginResponse issueTokens(LoginUser user, String displayName, String familyId) {
         String refreshToken = tokenStore.issueRefresh(
                 familyId,
@@ -175,6 +181,7 @@ public class AuthServiceImpl implements AuthService {
                 jwtUtil.getRefreshExpireSeconds());
     }
 
+    /** 判断账号是否已删除。 */
     private boolean isDeleted(Integer deleted) {
         return deleted != null && deleted == 1;
     }

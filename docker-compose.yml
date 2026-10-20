@@ -123,7 +123,7 @@ services:
         condition: service_healthy
     environment:
       OLLAMA_HOST: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:2b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3.5:2b}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-quentinz/bge-small-zh-v1.5:q4_0}
     entrypoint: ["/bin/sh", "-c"]
     command:

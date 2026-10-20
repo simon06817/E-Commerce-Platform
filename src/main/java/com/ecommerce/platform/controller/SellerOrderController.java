@@ -20,9 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Seller order endpoints. A seller only sees orders containing own products.
- */
+/** 卖家订单接口。 */
 @Tag(name = "Seller orders", description = "seller manages orders containing own products")
 @RestController
 @RequestMapping("/api/seller/orders")
@@ -32,6 +30,7 @@ public class SellerOrderController {
 
     private final OrderService orderService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "Page seller orders", description = "seller only")
     @GetMapping
     @PreAuthorize("hasRole('SELLER')")
@@ -42,6 +41,7 @@ public class SellerOrderController {
         return Result.success(orderService.getSellerOrderPage(loginUser.getId(), page, size, status));
     }
 
+    /** 分页查询订单及明细。 */
     @Operation(summary = "Page seller order details in one request", description = "seller only")
     @GetMapping("/page-details")
     @PreAuthorize("hasRole('SELLER')")
@@ -53,6 +53,7 @@ public class SellerOrderController {
                 loginUser.getId(), page, size, status));
     }
 
+    /** 根据主键查询数据。 */
     @Operation(summary = "Seller order detail", description = "seller only")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('SELLER')")
@@ -61,6 +62,7 @@ public class SellerOrderController {
         return Result.success(orderService.getSellerOrderDetail(loginUser.getId(), id));
     }
 
+    /** 订单发货。 */
     @Operation(summary = "Ship order", description = "seller only, paid order can be shipped")
     @PutMapping("/{id}/ship")
     @PreAuthorize("hasRole('SELLER')")

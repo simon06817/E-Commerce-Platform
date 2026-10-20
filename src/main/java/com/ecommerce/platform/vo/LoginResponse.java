@@ -5,9 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
-/**
- * Login result containing the JWT and basic account information.
- */
+/** 登录返回对象。 */
 @Data
 @AllArgsConstructor
 public class LoginResponse {

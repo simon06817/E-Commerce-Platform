@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Authenticated principal stored in the Spring Security context. It is built
- * from JWT claims and is used by controllers via {@code @AuthenticationPrincipal}.
- */
+/** 登录用户。 */
 @Data
 @NoArgsConstructor
 public class LoginUser {
@@ -21,6 +18,7 @@ public class LoginUser {
     @JsonIgnore
     private String jti;
 
+    /** 构造登录用户。 */
     public LoginUser(Long id, String username, AuthRole role) {
         this.id = id;
         this.username = username;

@@ -4,9 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ecommerce.platform.entity.OrderNotification;
 import org.apache.ibatis.annotations.Mapper;
 
-/**
- * MyBatis-Plus mapper for order notifications.
- */
+/** 订单通知数据访问接口。 */
 @Mapper
 public interface OrderNotificationMapper extends BaseMapper<OrderNotification> {
 }

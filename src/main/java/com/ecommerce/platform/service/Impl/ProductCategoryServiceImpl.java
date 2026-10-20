@@ -19,9 +19,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
-/**
- * Product category service with cache read-through and cache eviction on writes.
- */
+/** 商品分类服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMapper, ProductCategory>
@@ -29,6 +27,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
 
     private final CacheSupport cacheSupport;
 
+    /** 查询启用中的商品分类。 */
     @Override
     public List<ProductCategory> listEnabledCategories() {
         return cacheSupport.getOrLoad(
@@ -40,6 +39,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
                         .list());
     }
 
+    /** 分页查询商品分类。 */
     @Override
     public Page<ProductCategory> getCategoryPage(int current, int size, String name, Integer status) {
         Page<ProductCategory> page = new Page<>(current, size);
@@ -54,6 +54,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         return page(page, wrapper);
     }
 
+    /** 新增商品分类。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
@@ -64,6 +65,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         save(category);
     }
 
+    /** 修改商品分类。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
@@ -71,6 +73,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
         updateById(category);
     }
 
+    /** 修改状态。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)
@@ -80,6 +83,7 @@ public class ProductCategoryServiceImpl extends ServiceImpl<ProductCategoryMappe
                 .set(ProductCategory::getStatus, status));
     }
 
+    /** 删除商品分类。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(cacheNames = CacheNames.CATEGORY_LIST, allEntries = true)

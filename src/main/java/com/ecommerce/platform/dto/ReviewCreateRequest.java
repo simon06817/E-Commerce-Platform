@@ -7,9 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-/**
- * Buyer review payload. The order item proves the buyer really purchased it.
- */
+/** 创建评价请求对象。 */
 @Data
 public class ReviewCreateRequest {
 

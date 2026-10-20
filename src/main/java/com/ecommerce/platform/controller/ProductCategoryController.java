@@ -29,9 +29,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * Public category queries plus administrator category maintenance.
- */
+/** 商品分类接口。 */
 @Tag(name = "Product categories", description = "category tree and management")
 @RestController
 @RequestMapping("/api/categories")
@@ -42,6 +40,7 @@ public class ProductCategoryController {
     private final ProductCategoryService categoryService;
     private final ProductService productService;
 
+    /** 查询商品分类树。 */
     @Operation(summary = "Category tree", description = "public")
     @GetMapping("/tree")
     public Result<List<ProductCategory>> tree() {
@@ -49,12 +48,14 @@ public class ProductCategoryController {
         return Result.success(buildTree(list));
     }
 
+    /** 查询全部商品分类。 */
     @Operation(summary = "All categories", description = "public")
     @GetMapping
     public Result<List<ProductCategory>> listAll() {
         return Result.success(categoryService.listEnabledCategories());
     }
 
+    /** 根据主键查询数据。 */
     @Operation(summary = "Category detail", description = "public")
     @GetMapping("/{id}")
     public Result<ProductCategory> getById(@PathVariable @NotNull Long id) {
@@ -65,6 +66,7 @@ public class ProductCategoryController {
         return Result.success(category);
     }
 
+    /** 新增商品分类。 */
     @Operation(summary = "Create category", description = "admin only")
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -73,6 +75,7 @@ public class ProductCategoryController {
         return Result.success();
     }
 
+    /** 修改商品分类。 */
     @Operation(summary = "Update category", description = "admin only")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -83,6 +86,7 @@ public class ProductCategoryController {
         return Result.success();
     }
 
+    /** 修改状态。 */
     @Operation(summary = "Update category status", description = "admin only")
     @PutMapping("/{id}/status/{status}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -92,6 +96,7 @@ public class ProductCategoryController {
         return Result.success();
     }
 
+    /** 删除商品分类。 */
     @Operation(summary = "Delete category", description = "admin only")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -110,6 +115,7 @@ public class ProductCategoryController {
         return Result.success();
     }
 
+    /** 构建商品分类树。 */
     private List<ProductCategory> buildTree(List<ProductCategory> list) {
         Map<Long, ProductCategory> byId = list.stream()
                 .collect(Collectors.toMap(ProductCategory::getId, Function.identity()));

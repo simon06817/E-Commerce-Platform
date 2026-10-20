@@ -9,9 +9,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Buyer review for a purchased order item. One order item can be reviewed once.
- */
+/** 商品评价实体。 */
 @Data
 @TableName("product_review")
 public class ProductReview {

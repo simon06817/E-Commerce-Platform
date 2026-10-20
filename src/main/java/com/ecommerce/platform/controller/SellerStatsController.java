@@ -14,9 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Seller revenue statistics endpoints.
- */
+/** 卖家统计接口。 */
 @Tag(name = "Seller stats", description = "seller revenue statistics")
 @RestController
 @RequestMapping("/api/seller/stats")
@@ -25,6 +23,7 @@ public class SellerStatsController {
 
     private final OrderService orderService;
 
+    /** 查询卖家收入统计。 */
     @Operation(summary = "Seller revenue statistics", description = "today/7d/30d/all")
     @GetMapping
     @PreAuthorize("hasRole('SELLER')")

@@ -26,9 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Review endpoints: buyers publish reviews, everyone can read public ratings.
- */
+/** 商品评价接口。 */
 @Tag(name = "Product reviews", description = "verified purchase reviews and rating summary")
 @RestController
 @RequestMapping("/api")
@@ -38,6 +36,7 @@ public class ProductReviewController {
 
     private final ProductReviewService reviewService;
 
+    /** 创建商品评价。 */
     @Operation(summary = "Create review", description = "buyer only, completed order required")
     @PostMapping("/reviews")
     @PreAuthorize("hasRole('BUYER')")
@@ -46,6 +45,7 @@ public class ProductReviewController {
         return Result.success(reviewService.createReview(loginUser.getId(), request));
     }
 
+    /** 删除商品评价。 */
     @Operation(summary = "Delete own review", description = "buyer only")
     @DeleteMapping("/reviews/{id}")
     @PreAuthorize("hasRole('BUYER')")
@@ -55,6 +55,7 @@ public class ProductReviewController {
         return Result.success();
     }
 
+    /** 分页查询列表。 */
     @Operation(summary = "Product reviews", description = "public paged review list")
     @GetMapping("/products/{productId}/reviews")
     public Result<Page<ReviewVO>> list(@PathVariable @NotNull Long productId,
@@ -63,12 +64,14 @@ public class ProductReviewController {
         return Result.success(reviewService.getProductReviews(productId, page, size));
     }
 
+    /** 查询商品评价汇总。 */
     @Operation(summary = "Product rating summary", description = "public average rating")
     @GetMapping("/products/{productId}/reviews/summary")
     public Result<ReviewSummaryVO> summary(@PathVariable @NotNull Long productId) {
         return Result.success(reviewService.getProductSummary(productId));
     }
 
+    /** 分页查询卖家评价。 */
     @Operation(summary = "Seller review list", description = "seller only")
     @GetMapping("/seller/reviews")
     @PreAuthorize("hasRole('SELLER')")
@@ -78,6 +81,7 @@ public class ProductReviewController {
         return Result.success(reviewService.getSellerReviews(loginUser.getId(), page, size));
     }
 
+    /** 回复商品评价。 */
     @Operation(summary = "Reply to review", description = "seller only, own product")
     @PutMapping("/seller/reviews/{id}/reply")
     @PreAuthorize("hasRole('SELLER')")

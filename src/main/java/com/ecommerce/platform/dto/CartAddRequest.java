@@ -4,9 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-/**
- * Request body for adding one product to the current buyer's cart.
- */
+/** 添加购物车请求对象。 */
 @Data
 public class CartAddRequest {
 

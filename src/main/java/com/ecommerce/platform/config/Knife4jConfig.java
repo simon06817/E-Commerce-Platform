@@ -8,12 +8,11 @@ import io.swagger.v3.oas.models.info.License;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * OpenAPI/Knife4j documentation metadata for the HTTP API.
- */
+/** Knife4j 接口文档配置。 */
 @Configuration
 public class Knife4jConfig {
 
+    /** 构建接口文档信息。 */
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()

@@ -10,9 +10,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/**
- * Return/refund request for one shipped or completed order item.
- */
+/** 退款实体。 */
 @Data
 @TableName("order_return")
 public class OrderReturn {

@@ -13,9 +13,7 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Stores uploaded images on the local disk with generated file names.
- */
+/** 文件存储服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class FileStorageServiceImpl implements FileStorageService {
@@ -24,6 +22,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
     private final UploadProperties uploadProperties;
 
+    /** 保存上传图片并返回访问地址。 */
     @Override
     public String storeImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {

@@ -42,10 +42,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Core order service. Implements idempotent checkout, stock-sensitive
- * cancellation, buyer payment/receipt and seller shipping flows.
- */
+/** 订单服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements OrderService {
@@ -58,10 +55,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private final UserBuyerService userBuyerService;
     private final UserSellerService userSellerService;
 
+    /** 分页查询买家订单。 */
     @Override
     public Page<Order> getOrderPage(Long buyerId, int current, int size, Integer status,
                                     Boolean reviewed) {
-        // Buyers can only see their own orders.
+        // 买家只能查看自己的订单。
         Page<Order> page = new Page<>(current, size);
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Order::getBuyerId, buyerId);
@@ -79,12 +77,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return page(page, wrapper);
     }
 
+    /** 分页查询买家订单详情。 */
     @Override
     public Page<OrderVO> getOrderPageDetails(Long buyerId, int current, int size,
                                              Integer status, Boolean reviewed) {
         return toVOPage(getOrderPage(buyerId, current, size, status, reviewed));
     }
 
+    /** 查询订单详情。 */
     @Override
     public OrderVO getOrderDetail(Long buyerId, Long orderId) {
         Order order = getById(orderId);
@@ -97,6 +97,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return toVO(order, items);
     }
 
+    /** 转换业务返回对象。 */
     private OrderVO toVO(Order order, List<OrderItem> items) {
         UserBuyer buyer = userBuyerService.getById(order.getBuyerId());
         UserSeller seller = order.getSellerId() == null
@@ -121,6 +122,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return toVO(order, items, buyers, sellers, products, reviewsByOrder);
     }
 
+    /** 转换业务返回对象。 */
     private OrderVO toVO(Order order, List<OrderItem> items,
                          Map<Long, UserBuyer> buyers,
                          Map<Long, UserSeller> sellers,
@@ -191,6 +193,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return vo;
     }
 
+    /** 转换分页返回对象。 */
     private Page<OrderVO> toVOPage(Page<Order> orderPage) {
         List<Order> orders = orderPage.getRecords();
         Page<OrderVO> result = new Page<>(
@@ -256,6 +259,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return result;
     }
 
+    /** 转换订单评价返回对象。 */
     private OrderReviewVO toOrderReviewVO(ProductReview review) {
         OrderReviewVO vo = new OrderReviewVO();
         vo.setId(review.getId());
@@ -268,6 +272,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return vo;
     }
 
+    /** 创建订单。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public List<Order> createOrder(Long buyerId, OrderCreateRequest request) {
@@ -278,8 +283,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
     }
 
+    /** 在事务内按卖家拆分并创建订单。 */
     private List<Order> createOrderInTransaction(Long buyerId, OrderCreateRequest request) {
-        // One checkout submission can create one independent order per seller.
+        // 一次结算可按卖家生成多张订单。
         List<Order> existingGroup = list(new LambdaQueryWrapper<Order>()
                 .eq(Order::getBuyerId, buyerId)
                 .eq(Order::getCheckoutGroupId, request.getIdempotencyKey())
@@ -287,7 +293,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (!existingGroup.isEmpty()) {
             return existingGroup;
         }
-        // Compatibility for single legacy orders created before split orders.
+        // 兼容拆单前的历史订单。
         Order legacy = getOne(new LambdaQueryWrapper<Order>()
                 .eq(Order::getBuyerId, buyerId)
                 .eq(Order::getIdempotencyKey, request.getIdempotencyKey())
@@ -312,7 +318,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
 
         Map<Long, List<CheckoutLine>> linesBySeller = new TreeMap<>();
-        // Validate every checked cart line before creating the order.
+        // 创建订单前校验所有已选购物车项。
         for (Cart cart : cartList) {
             Product product = productService.getProductById(cart.getProductId());
             if (product == null || product.getStatus() != ProductStatusEnum.ON_SALE.getCode()) {
@@ -351,7 +357,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             for (CheckoutLine line : checkoutLines) {
                 Cart cart = line.cart();
                 Product product = line.product();
-                // Reuse the already loaded product; the update itself is still atomic.
+                // 复用已查询的商品，库存更新仍由条件更新保证原子性。
                 productService.decreaseStock(product, cart.getNum());
 
                 OrderItem item = new OrderItem();
@@ -373,10 +379,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return createdOrders;
     }
 
+    /** 关闭超时未支付订单。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int closeExpiredOrders(int expireMinutes) {
-        // Batch scan keeps each scheduler run bounded.
+        // 每轮定时扫描限制批量大小。
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(expireMinutes);
         List<Order> expired = lambdaQuery()
                 .eq(Order::getStatus, OrderStatusEnum.UNPAID.getCode())
@@ -390,17 +397,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 cancelOrder(order.getBuyerId(), order.getId());
                 closed++;
             } catch (BusinessException ignored) {
-                // already paid or canceled by another request
+                // 已被其他请求支付或取消
             }
         }
         return closed;
     }
 
+    /** 取消待付款订单并恢复库存。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancelOrder(Long buyerId, Long orderId) {
         getOwnedOrder(buyerId, orderId);
-        // Conditional update makes cancellation safe against concurrent pay/cancel.
+        // 条件更新避免支付和取消并发冲突。
         boolean updated = update(new LambdaUpdateWrapper<Order>()
                 .eq(Order::getId, orderId)
                 .eq(Order::getStatus, OrderStatusEnum.UNPAID.getCode())
@@ -411,11 +419,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         restoreStock(orderId);
     }
 
+    /** 支付待付款订单。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void payOrder(Long buyerId, Long orderId) {
         Order order = getOwnedOrder(buyerId, orderId);
-        // Only unpaid orders can transition to paid.
+        // 只有待付款订单可以支付。
         boolean updated = update(new LambdaUpdateWrapper<Order>()
                 .eq(Order::getId, orderId)
                 .eq(Order::getStatus, OrderStatusEnum.UNPAID.getCode())
@@ -427,10 +436,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         orderEventService.publishOrderPaid(order);
     }
 
+    /** 分页查询卖家订单。 */
     @Override
     public Page<Order> getSellerOrderPage(Long sellerId, int current, int size, Integer status) {
-        // New split orders have seller_id directly. Legacy orders fall back to
-        // product ownership so historical data remains visible.
+        // 新拆单订单直接使用 seller_id，历史订单回退到
+        // 商品归属，保证历史订单仍可查询。
         Page<Order> page = new Page<>(current, size);
         List<Long> productIds = sellerProductIds(sellerId);
         List<Long> orderIds = productIds.isEmpty()
@@ -456,15 +466,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return page(page, wrapper);
     }
 
+    /** 分页查询卖家订单详情。 */
     @Override
     public Page<OrderVO> getSellerOrderPageDetails(Long sellerId, int current, int size,
                                                    Integer status) {
         return toVOPage(getSellerOrderPage(sellerId, current, size, status));
     }
 
+    /** 查询卖家订单详情。 */
     @Override
     public OrderVO getSellerOrderDetail(Long sellerId, Long orderId) {
-        // A seller may only inspect orders containing own products.
+        // 卖家只能查看包含自己商品的订单。
         Order order = getById(orderId);
         if (order == null) {
             throw new BusinessException(ResultCode.NOT_FOUND);
@@ -478,11 +490,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return toVO(order, items);
     }
 
+    /** 卖家订单发货。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void shipOrder(Long sellerId, Long orderId) {
         ensureSellerOrder(orderId, sellerId);
-        // Shipping is allowed only after payment.
+        // 只有已支付订单可以发货。
         boolean updated = update(new LambdaUpdateWrapper<Order>()
                 .eq(Order::getId, orderId)
                 .eq(Order::getStatus, OrderStatusEnum.PAID.getCode())
@@ -493,11 +506,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
     }
 
+    /** 确认订单收货。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void confirmOrder(Long buyerId, Long orderId) {
         getOwnedOrder(buyerId, orderId);
-        // Receipt confirmation is allowed only after shipping.
+        // 只有已发货订单可以确认收货。
         boolean updated = update(new LambdaUpdateWrapper<Order>()
                 .eq(Order::getId, orderId)
                 .eq(Order::getStatus, OrderStatusEnum.SHIPPED.getCode())
@@ -508,6 +522,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
     }
 
+    /** 自动完成已发货订单。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int autoCompleteShippedOrders(int hours) {
@@ -535,6 +550,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return completed;
     }
 
+    /** 分页查询管理员订单。 */
     @Override
     public Page<Order> getAdminOrderPage(int current, int size, String orderNo,
                                          Long buyerId, Integer status) {
@@ -553,6 +569,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return page(page, wrapper);
     }
 
+    /** 查询管理员订单详情。 */
     @Override
     public OrderVO getAdminOrderDetail(Long orderId) {
         Order order = getById(orderId);
@@ -565,6 +582,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return toVO(order, items);
     }
 
+    /** 强制关闭订单并恢复库存。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void forceCancelOrder(Long orderId) {
@@ -572,7 +590,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order == null) {
             throw new BusinessException(ResultCode.NOT_FOUND);
         }
-        // Completed and already-canceled orders cannot be force-canceled.
+        // 已完成或已取消订单不能强制关单。
         boolean updated = update(new LambdaUpdateWrapper<Order>()
                 .eq(Order::getId, orderId)
                 .in(Order::getStatus,
@@ -586,6 +604,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         restoreStock(orderId);
     }
 
+    /** 查询卖家收入统计。 */
     @Override
     public SellerStatsVO getSellerStats(Long sellerId, String range) {
         List<Long> productIds = sellerProductIds(sellerId);
@@ -626,6 +645,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return new SellerStatsVO(revenue, orderCount, itemCount, average, range);
     }
 
+    /** 计算统计起始时间。 */
     private LocalDateTime statsSince(String range) {
         if (range == null) {
             return null;
@@ -641,6 +661,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private record CheckoutLine(Cart cart, Product product) {
     }
 
+    /** 恢复订单商品库存。 */
     private void restoreStock(Long orderId) {
         List<OrderItem> items = orderItemService.lambdaQuery()
                 .eq(OrderItem::getOrderId, orderId)
@@ -650,6 +671,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
     }
 
+    /** 查询并校验订单归属。 */
     private Order getOwnedOrder(Long buyerId, Long orderId) {
         Order order = getById(orderId);
         if (order == null || !buyerId.equals(order.getBuyerId())) {
@@ -658,6 +680,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         return order;
     }
 
+    /** 查询卖家全部商品 ID。 */
     private List<Long> sellerProductIds(Long sellerId) {
         return productService.lambdaQuery()
                 .eq(Product::getSellerId, sellerId)
@@ -667,6 +690,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .toList();
     }
 
+    /** 校验卖家是否有权访问订单。 */
     private void ensureSellerOrder(Long orderId, Long sellerId) {
         Order order = getById(orderId);
         if (order == null) {
@@ -680,6 +704,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         }
     }
 
+    /** 判断卖家是否拥有订单商品。 */
     private boolean sellerOwnsOrder(Order order, Long sellerId, List<OrderItem> items) {
         if (order.getSellerId() != null) {
             return sellerId.equals(order.getSellerId());
@@ -693,6 +718,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .anyMatch(productIds::contains);
     }
 
+    /** 生成拆单子订单幂等键。 */
     private String subOrderIdempotencyKey(String checkoutGroupId, Long sellerId) {
         String suffix = "-seller-" + sellerId;
         int maxPrefixLength = 64 - suffix.length();

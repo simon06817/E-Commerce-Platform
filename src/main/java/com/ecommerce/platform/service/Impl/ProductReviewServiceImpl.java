@@ -29,10 +29,7 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Review service enforcing verified-purchase rules and masking buyer identity
- * in public responses.
- */
+/** 商品评价服务实现。 */
 @Service
 @RequiredArgsConstructor
 public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, ProductReview>
@@ -44,6 +41,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
     private final ProductService productService;
     private final OrderReturnMapper orderReturnMapper;
 
+    /** 创建商品评价。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ReviewVO createReview(Long buyerId, ReviewCreateRequest request) {
@@ -55,7 +53,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         if (order == null || !buyerId.equals(order.getBuyerId())) {
             throw new BusinessException(ResultCode.NOT_FOUND);
         }
-        // Reviews are only allowed after the buyer confirmed receipt.
+        // 只有买家确认收货后才能评价。
         if (order.getStatus() != OrderStatusEnum.COMPLETED.getCode()) {
             throw new BusinessException(ResultCode.REVIEW_NOT_ALLOWED);
         }
@@ -85,6 +83,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         return toVO(review);
     }
 
+    /** 分页查询商品评价。 */
     @Override
     public Page<ReviewVO> getProductReviews(Long productId, int current, int size) {
         Page<ProductReview> page = lambdaQuery()
@@ -97,6 +96,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         return result;
     }
 
+    /** 查询商品评价汇总。 */
     @Override
     public ReviewSummaryVO getProductSummary(Long productId) {
         QueryWrapper<ProductReview> wrapper = new QueryWrapper<>();
@@ -114,6 +114,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         return new ReviewSummaryVO(Math.round(average * 10.0) / 10.0, count);
     }
 
+    /** 删除商品评价。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteReview(Long buyerId, Long reviewId) {
@@ -124,6 +125,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         removeById(reviewId);
     }
 
+    /** 分页查询卖家商品评价。 */
     @Override
     public Page<ReviewVO> getSellerReviews(Long sellerId, int current, int size) {
         List<Long> productIds = productService.lambdaQuery()
@@ -144,6 +146,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         return result;
     }
 
+    /** 回复商品评价。 */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void replyReview(Long sellerId, Long reviewId, String content) {
@@ -160,6 +163,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         updateById(review);
     }
 
+    /** 转换业务返回对象。 */
     private ReviewVO toVO(ProductReview review) {
         ReviewVO vo = new ReviewVO();
         vo.setId(review.getId());
@@ -175,6 +179,7 @@ public class ProductReviewServiceImpl extends ServiceImpl<ProductReviewMapper, P
         return vo;
     }
 
+    /** 脱敏展示买家名称。 */
     private String maskBuyerName(Long buyerId) {
         UserBuyer buyer = userBuyerService.getById(buyerId);
         String username = buyer == null ? "anonymous" : buyer.getUsername();

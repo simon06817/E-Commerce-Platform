@@ -22,9 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Seller return handling endpoints.
- */
+/** 卖家退款接口。 */
 @Tag(name = "Seller returns", description = "seller approves or rejects return requests")
 @RestController
 @RequestMapping("/api/seller/returns")
@@ -35,6 +33,7 @@ public class SellerReturnController {
 
     private final OrderReturnService orderReturnService;
 
+    /** 分页查询列表。 */
     @Operation(summary = "Seller return list")
     @GetMapping
     public Result<Page<ReturnVO>> list(@AuthenticationPrincipal LoginUser loginUser,
@@ -43,6 +42,7 @@ public class SellerReturnController {
         return Result.success(orderReturnService.getSellerReturns(loginUser.getId(), page, size));
     }
 
+    /** 同意退款申请。 */
     @Operation(summary = "Approve return", description = "restores stock and performs mock refund")
     @PutMapping("/{id}/approve")
     public Result<Void> approve(@AuthenticationPrincipal LoginUser loginUser,
@@ -53,6 +53,7 @@ public class SellerReturnController {
         return Result.success();
     }
 
+    /** 拒绝退款申请。 */
     @Operation(summary = "Reject return")
     @PutMapping("/{id}/reject")
     public Result<Void> reject(@AuthenticationPrincipal LoginUser loginUser,

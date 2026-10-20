@@ -2,9 +2,7 @@ package com.ecommerce.platform.common;
 
 import lombok.Getter;
 
-/**
- * Product shelf status. Values match the {@code product.status} column.
- */
+/** 商品状态枚举。 */
 @Getter
 public enum ProductStatusEnum {
     OFF_SALE(0, "已下架"),
@@ -13,11 +11,13 @@ public enum ProductStatusEnum {
     private final int code;
     private final String desc;
 
+    /** 构造商品状态枚举。 */
     ProductStatusEnum(int code, String desc) {
         this.code = code;
         this.desc = desc;
     }
 
+    /** 根据状态码获取枚举。 */
     public static ProductStatusEnum fromCode(int code) {
         for (ProductStatusEnum status : values()) {
             if (status.code == code) {

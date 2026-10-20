@@ -10,13 +10,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Logs one line per HTTP request with method, path, response status and time.
- */
+/** 请求日志过滤器。 */
 @Slf4j
 @Component
 public class RequestLoggingFilter extends OncePerRequestFilter {
 
+    /** 执行请求过滤处理。 */
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
